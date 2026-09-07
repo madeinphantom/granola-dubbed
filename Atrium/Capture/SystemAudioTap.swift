@@ -5,6 +5,8 @@ import AVFoundation
 enum TapCaptureError: Error {
     case tapCreateFailed(OSStatus)
     case aggregateCreateFailed(OSStatus)
+    case ioProcCreateFailed(OSStatus)
+    case deviceStartFailed(OSStatus)
     case noDefaultOutput
 }
 
@@ -105,10 +107,19 @@ final class SystemAudioTap {
             handler(inInputData, frameCount, inNow.pointee)
         }
         var procID: AudioDeviceIOProcID?
-        AudioDeviceCreateIOProcIDWithBlock(&procID, agg, DispatchQueue(label: "atrium.tap.io"), block)
+        let procStatus = AudioDeviceCreateIOProcIDWithBlock(
+            &procID, agg, DispatchQueue(label: "atrium.tap.io"), block)
+        guard procStatus == noErr, let procID else {
+            // Leave no aggregate/tap behind if we cannot actually receive audio.
+            stop()
+            throw TapCaptureError.ioProcCreateFailed(procStatus)
+        }
         self.ioProcID = procID
-        if let procID {
-            AudioDeviceStart(agg, procID)
+
+        let startStatus = AudioDeviceStart(agg, procID)
+        guard startStatus == noErr else {
+            stop()
+            throw TapCaptureError.deviceStartFailed(startStatus)
         }
     }
 
