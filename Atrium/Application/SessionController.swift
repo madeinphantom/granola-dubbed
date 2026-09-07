@@ -146,7 +146,9 @@ final class SessionController: ObservableObject {
                 }
                 
                 let allWords = rawSegments.flatMap { $0.words }
-                let alignedSegments = transcriptAligner.align(words: allWords, speakerTurns: typedTurns)
+                let alignedSegments = transcriptAligner.align(words: allWords,
+                                                             speakerTurns: typedTurns,
+                                                             fallbackSpeakerId: themSpeakerID)
                 
                 let transcriptDoc = TranscriptDocument(version: 1, language: "en", segments: alignedSegments)
                 let encoder = JSONEncoder()

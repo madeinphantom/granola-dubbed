@@ -41,3 +41,20 @@ access.
 
 **How to apply.** Treat build settings as claims to verify against the
 filesystem, not as inert configuration.
+
+## 2026-09-07 — Aligner silently discarded every word when speaker detection failed
+
+**What happened.** `TranscriptAligner.align` dropped any word that overlapped no
+speaker turn. If `DualChannelAssigner` returned no turns — both tracks quiet,
+a missing `them.caf`, or energy below threshold — all ASR words were discarded.
+The pipeline then wrote an empty `transcript.json`, set `state = .ready`, and
+reported success. A full meeting would transcribe to nothing, with no error.
+
+**Why it matters.** The failure is invisible at exactly the moment it costs
+most: after a real call, when the audio is already gone. Silent data loss is
+worse than a crash.
+
+**How to apply.** When a stage filters records, ask what happens when the
+filter's input is empty or degraded. Default to preserving data with a fallback
+attribution rather than dropping it. Never mark a result `.ready` without
+asserting it is non-empty.

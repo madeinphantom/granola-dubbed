@@ -27,13 +27,29 @@ final class TranscriptAlignerTests: XCTestCase {
         XCTAssertEqual(segments.last?.speakerId, speakerB)
     }
 
-    func testWordOutsideEverySpeakerTurnIsDropped() {
-        let segments = TranscriptAligner().align(words: [word(9.0, 9.5, "lost")], speakerTurns: turns)
-        XCTAssertTrue(segments.isEmpty)
+    func testWordOutsideEverySpeakerTurnKeepsPrecedingSpeaker() {
+        // A word in a gap between turns must not be discarded.
+        let segments = TranscriptAligner().align(
+            words: [word(0.0, 0.5, "a"), word(9.0, 9.5, "orphan")],
+            speakerTurns: turns
+        )
+        XCTAssertEqual(segments.flatMap(\.words).count, 2)
     }
 
-    func testEmptyInputs() {
-        XCTAssertTrue(TranscriptAligner().align(words: [word(0, 1, "x")], speakerTurns: []).isEmpty)
+    func testWordsSurviveWhenSpeakerDetectionYieldsNoTurns() {
+        // Regression: previously every word was dropped when the energy-based
+        // assigner produced no turns, saving an empty transcript as "ready"
+        // and losing the entire meeting.
+        let fallback = UUID()
+        let words = (0..<12).map { word(Double($0), Double($0) + 0.5, "w\($0)") }
+
+        let segments = TranscriptAligner().align(words: words, speakerTurns: [], fallbackSpeakerId: fallback)
+
+        XCTAssertEqual(segments.flatMap(\.words).count, 12)
+        XCTAssertTrue(segments.allSatisfy { $0.speakerId == fallback })
+    }
+
+    func testEmptyWordListProducesNoSegments() {
         XCTAssertTrue(TranscriptAligner().align(words: [], speakerTurns: turns).isEmpty)
     }
 }

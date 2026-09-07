@@ -68,7 +68,8 @@ Atrium requires:
 - **Microphone access** — to record your voice
 - **Screen recording** — to capture system audio (SCK fallback path)
 
-The app displays a consent screen on first launch requiring the user to acknowledge their responsibility to notify meeting participants about recording.
+Recording starts immediately on ⌘R — there is no onboarding or consent gate.
+You are responsible for notifying participants where the law requires it.
 
 ## Notarization (Distribution)
 

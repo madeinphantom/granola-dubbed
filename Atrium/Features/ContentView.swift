@@ -13,16 +13,10 @@ struct ContentView: View {
     @EnvironmentObject var appState: AppState
     
     var body: some View {
-        Group {
-            if appState.hasGivenConsent {
-                MainAppView()
-                    .modelContainer(appState.sessionController.audioStore.container)
-            } else {
-                OnboardingView()
-            }
-        }
-        .background(Color.black)
-        .foregroundColor(.white)
+        MainAppView()
+            .modelContainer(appState.sessionController.audioStore.container)
+            .background(Color.black)
+            .foregroundColor(.white)
     }
 }
 
@@ -547,54 +541,6 @@ struct TranscriptRow: View {
         let m = Int(t) / 60
         let s = Int(t) % 60
         return String(format: "%02d:%02d", m, s)
-    }
-}
-
-// MARK: - Onboarding
-
-struct OnboardingView: View {
-    @EnvironmentObject var appState: AppState
-    @State private var understandsConsent = false
-    
-    var body: some View {
-        VStack(spacing: 40) {
-            Text("ATRIUM")
-                .font(.system(size: 48, weight: .light, design: .monospaced))
-                .tracking(8)
-            
-            VStack(spacing: 16) {
-                Text("CONSENT REQUIRED")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.red)
-                
-                Text("Atrium records the microphone and everything playing through this Mac. In many places you must tell the other people on the call. You are responsible for consent.")
-                    .font(.system(.body))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(Color(white: 0.75))
-                    .frame(maxWidth: 420)
-            }
-            
-            Toggle("I understand I must notify participants.", isOn: $understandsConsent)
-                .font(.system(.caption, design: .monospaced))
-                .toggleStyle(.checkbox)
-                .tint(.white)
-            
-            Button(action: {
-                appState.hasGivenConsent = true
-            }) {
-                Text("INITIALIZE")
-                    .font(.system(.headline, design: .monospaced))
-                    .tracking(2)
-                    .frame(width: 200, height: 50)
-                    .background(understandsConsent ? Color.white : Color(white: 0.15))
-                    .foregroundColor(understandsConsent ? .black : Color(white: 0.4))
-            }
-            .buttonStyle(.plain)
-            .disabled(!understandsConsent)
-        }
-        .padding(60)
-        .frame(width: 600, height: 500)
-        .background(Color.black)
     }
 }
 

@@ -1,7 +1,15 @@
 import Foundation
 
 final class TranscriptAligner {
-    func align(words: [TranscriptWord], speakerTurns: [(start: TimeInterval, end: TimeInterval, speakerId: UUID)]) -> [TranscriptSegment] {
+    /// Assigns each word to the speaker turn it overlaps most.
+    ///
+    /// Words that overlap no turn are attributed to `fallbackSpeakerId` (or the
+    /// nearest preceding turn) rather than discarded — dropping them would
+    /// silently produce an empty transcript whenever speaker detection fails,
+    /// losing a whole meeting's words.
+    func align(words: [TranscriptWord],
+               speakerTurns: [(start: TimeInterval, end: TimeInterval, speakerId: UUID)],
+               fallbackSpeakerId: UUID? = nil) -> [TranscriptSegment] {
         var segments: [TranscriptSegment] = []
         
         // Simple logic: assign word to speaker with most overlap
@@ -21,6 +29,14 @@ final class TranscriptAligner {
                 }
             }
             
+            // Never drop a transcribed word: fall back to the most recent
+            // speaker, then to the caller's fallback, then to any known turn.
+            if bestSpeaker == nil {
+                bestSpeaker = segments.last?.speakerId
+                    ?? fallbackSpeakerId
+                    ?? speakerTurns.first?.speakerId
+            }
+
             if let bestSpeaker = bestSpeaker {
                 if segments.last?.speakerId == bestSpeaker {
                     segments[segments.count - 1].words.append(word)
