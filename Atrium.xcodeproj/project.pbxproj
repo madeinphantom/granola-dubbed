@@ -22,6 +22,7 @@
 		807A6E31E1C3DE1139A4B7B3 /* DualChannelAssigner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280B4C5AE2452358D9BB254A /* DualChannelAssigner.swift */; };
 		82077619E5E635954D3E4D7C /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */; };
 		8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */; };
+		954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */; };
 		9BEDD5F1D50008FF3F1AA7B4 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7C4BEC9F45E32692199F0A95 /* WhisperKit */; };
 		A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */; };
 		AE981FE1B3FBB0A386E9669A /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */; };
@@ -56,6 +57,7 @@
 		2C2523289F5715D177C7174D /* AtriumApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtriumApp.swift; sourceTree = "<group>"; };
 		2F49A288B57C46789C04E305 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		30FB878C5BA2616E77D02069 /* ASREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASREngine.swift; sourceTree = "<group>"; };
+		3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWriterDrainTests.swift; sourceTree = "<group>"; };
 		40D3FBEFDCCF48A20DD74BCA /* AudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStore.swift; sourceTree = "<group>"; };
 		4A6BDB428C05BD9641841942 /* RecPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecPillView.swift; sourceTree = "<group>"; };
 		515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRingBufferTests.swift; sourceTree = "<group>"; };
@@ -176,6 +178,7 @@
 				515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */,
 				C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */,
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
+				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
 				ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */,
 			);
 			path = AtriumTests;
@@ -330,6 +333,7 @@
 				A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */,
 				3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */,
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,
+				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
 				8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

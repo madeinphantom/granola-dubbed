@@ -58,3 +58,22 @@ worse than a crash.
 filter's input is empty or degraded. Default to preserving data with a fallback
 attribution rather than dropping it. Never mark a result `.ready` without
 asserting it is non-empty.
+
+## 2026-09-07 — Fixed-size drain loop could never catch up with a jittery producer
+
+**What happened.** `SessionWriter.startPolling` read exactly 2400 frames (50ms)
+per tick, then slept 50ms. `Task.sleep` guarantees only a *minimum* delay, so
+ticks routinely run late and more than one chunk accumulates — but the consumer
+could only ever remove one. Simulated with 10% late ticks, 2.0s of audio was
+permanently stranded in the buffer after 200 ticks. Sustained, the 10s ring
+buffer overflows and `AudioRingBuffer.write` discards the oldest frames
+returning Void — no error, no counter, nothing to observe.
+
+**Why it matters.** Two silent-loss mechanisms stacked: a consumer that cannot
+drain, and a buffer that discards without reporting. The recording just has
+gaps.
+
+**How to apply.** A drain loop must consume *all available* data per tick, never
+a fixed quantum sized to the average production rate — there is no headroom to
+recover from jitter. Any lossy buffer must count what it discards and something
+must read that counter.

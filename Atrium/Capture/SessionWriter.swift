@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import OSLog
 
 enum SessionWriterError: Error {
     case missingIncompleteMarker
@@ -7,6 +8,8 @@ enum SessionWriterError: Error {
 }
 
 final class SessionWriter {
+    private let logger = Logger(subsystem: "app.atrium.capture", category: "SessionWriter")
+
     let sessionURL: URL
     let youTrackURL: URL
     let themTrackURL: URL
@@ -51,20 +54,35 @@ final class SessionWriter {
     func startPolling() {
         pollingTask = Task {
             while !Task.isCancelled {
-                // Read 50ms chunks (48000 * 0.05 = 2400 frames)
-                let frameCount = 2400
-                if let micData = micBuffer.read(count: frameCount) {
-                    writeToAudioFile(file: youFile, data: micData, channels: 1)
-                }
-                if let tapData = tapBuffer.read(count: frameCount * 2) {
-                    writeToAudioFile(file: themFile, data: tapData, channels: 2)
-                }
-                
+                drainAvailable()
                 try? await Task.sleep(nanoseconds: 50_000_000)
             }
+            // Final drain: Task.sleep guarantees only a minimum delay, so a
+            // backlog may remain when polling is cancelled.
+            drainAvailable()
         }
     }
     
+    /// Drains everything currently buffered, not a single fixed-size chunk.
+    ///
+    /// `Task.sleep` only guarantees a *minimum* delay, so ticks routinely run
+    /// late and more than one 50ms chunk accumulates. Reading a fixed 2400
+    /// frames per tick could never catch up, so the backlog grew until the
+    /// ring buffer overflowed and silently discarded recorded audio.
+    private func drainAvailable() {
+        // 50ms chunks (48000 * 0.05 = 2400 frames), drained until exhausted.
+        let chunkFrames = 2400
+
+        while micBuffer.availableFrames >= chunkFrames,
+              let micData = micBuffer.read(count: chunkFrames) {
+            writeToAudioFile(file: youFile, data: micData, channels: 1)
+        }
+        while tapBuffer.availableFrames >= chunkFrames * 2,
+              let tapData = tapBuffer.read(count: chunkFrames * 2) {
+            writeToAudioFile(file: themFile, data: tapData, channels: 2)
+        }
+    }
+
     private func writeToAudioFile(file: AVAudioFile?, data: [Float], channels: AVAudioChannelCount) {
         guard let file = file, let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: channels) else { return }
         let frameCount = AVAudioFrameCount(data.count / Int(channels))
@@ -80,8 +98,17 @@ final class SessionWriter {
         try? file.write(from: buffer)
     }
     
+    /// Frames lost to ring-buffer overflow during the session. Non-zero means
+    /// the recording has gaps.
+    var droppedFrames: Int { micBuffer.totalDroppedFrames + tapBuffer.totalDroppedFrames }
+
     func stopAndFinalize() async throws {
         pollingTask?.cancel()
+
+        let dropped = droppedFrames
+        if dropped > 0 {
+            logger.error("Recording dropped \(dropped) frames (~\(Double(dropped) / 48000.0)s) to ring-buffer overflow")
+        }
         youFile = nil
         themFile = nil
         
