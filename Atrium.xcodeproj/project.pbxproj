@@ -27,6 +27,7 @@
 		A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */; };
 		AE981FE1B3FBB0A386E9669A /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */; };
 		BFB76B567929F547DDEC345B /* SCKFallbackCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24638F750630307901676C34 /* SCKFallbackCapture.swift */; };
+		C7066FCDE41AFE6CC8227FD7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30245E25CBC344490C1E0F3F /* Assets.xcassets */; };
 		CDA193BB27A26BB208D62C09 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FB878C5BA2616E77D02069 /* ASREngine.swift */; };
 		D068387DE82C47730D8DFD55 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE554720AF9902F7B3E23BDC /* Models.swift */; };
 		D6CFF80327BA7D28AF12FF07 /* AtriumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2523289F5715D177C7174D /* AtriumApp.swift */; };
@@ -56,6 +57,7 @@
 		29D98BB60E8D243EB13AD135 /* Atrium.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Atrium.entitlements; sourceTree = "<group>"; };
 		2C2523289F5715D177C7174D /* AtriumApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtriumApp.swift; sourceTree = "<group>"; };
 		2F49A288B57C46789C04E305 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		30245E25CBC344490C1E0F3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		30FB878C5BA2616E77D02069 /* ASREngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASREngine.swift; sourceTree = "<group>"; };
 		3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWriterDrainTests.swift; sourceTree = "<group>"; };
 		40D3FBEFDCCF48A20DD74BCA /* AudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStore.swift; sourceTree = "<group>"; };
@@ -206,6 +208,7 @@
 			isa = PBXGroup;
 			children = (
 				80350BDC19EC8D87E72747E9 /* AppState.swift */,
+				30245E25CBC344490C1E0F3F /* Assets.xcassets */,
 				29D98BB60E8D243EB13AD135 /* Atrium.entitlements */,
 				2C2523289F5715D177C7174D /* AtriumApp.swift */,
 				B818957C90D5676C33FC294A /* Info.plist */,
@@ -226,6 +229,7 @@
 			buildConfigurationList = CA01985B8127F666AF0E91ED /* Build configuration list for PBXNativeTarget "Atrium" */;
 			buildPhases = (
 				798B81162AA667EF3CCDE1FA /* Sources */,
+				A660AE4A059C78D9909AD83A /* Resources */,
 				E0FDD69A97015F1D6872419A /* Frameworks */,
 			);
 			buildRules = (
@@ -295,6 +299,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A660AE4A059C78D9909AD83A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C7066FCDE41AFE6CC8227FD7 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		798B81162AA667EF3CCDE1FA /* Sources */ = {

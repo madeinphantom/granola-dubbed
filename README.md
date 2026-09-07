@@ -48,6 +48,13 @@ Run the unit tests with:
 xcodebuild test -scheme Atrium -destination 'platform=macOS'
 ```
 
+## Menu Bar
+
+Atrium lives in the menu bar as a waveform icon, which turns into a red record
+indicator while recording. Click it to start/stop and see recent sessions. The
+app also keeps a normal window and Dock icon (`LSUIElement` is `false`); set it
+to `true` in `project.yml` for a menu-bar-only tool.
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
