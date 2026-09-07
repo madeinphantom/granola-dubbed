@@ -1,0 +1,40 @@
+name: Atrium
+options:
+  bundleIdPrefix: app
+  deploymentTarget:
+    macOS: 15.0
+
+packages:
+  WhisperKit:
+    url: https://github.com/argmaxinc/WhisperKit
+    from: 0.9.0
+
+targets:
+  Atrium:
+    type: application
+    platform: macOS
+    sources: [Atrium]
+    info:
+      path: Atrium/Info.plist
+      properties:
+        LSUIElement: false
+        NSMicrophoneUsageDescription: "Atrium needs microphone access to record your voice during meetings."
+        NSScreenCaptureUsageDescription: "Atrium needs screen recording access to capture system audio from your meetings."
+    entitlements:
+      path: Atrium/Atrium.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.atrium.mac
+        DEVELOPMENT_TEAM: "" # Needs to be configured by the user
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - package: WhisperKit
+
+  AtriumTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [AtriumTests]
+    dependencies:
+      - target: Atrium
