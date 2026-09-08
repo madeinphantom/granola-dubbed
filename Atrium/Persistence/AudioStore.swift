@@ -17,11 +17,21 @@ final class AudioStore: ObservableObject {
     }
     
     func delete(meeting: Meeting) {
-        // Delete audio files from disk
+        // Delete audio files from disk.
+        //
+        // Derive the directory from the meeting id rather than from
+        // audioMixRelativePath: that property defaults to "", and
+        // "Atrium/" + "" then deletingLastPathComponent() resolves to
+        // Application Support itself — deleting every app's data on the Mac.
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let sessionDir = appSupport.appendingPathComponent("Atrium/\(meeting.audioMixRelativePath)").deletingLastPathComponent()
-        
-        if FileManager.default.fileExists(atPath: sessionDir.path) {
+        let sessionsRoot = appSupport.appendingPathComponent("Atrium/Sessions", isDirectory: true)
+        let sessionDir = sessionsRoot.appendingPathComponent(meeting.id.uuidString, isDirectory: true)
+
+        // Belt and braces: never remove anything that is not a session directory.
+        let isInsideSessions = sessionDir.standardizedFileURL.path
+            .hasPrefix(sessionsRoot.standardizedFileURL.path + "/")
+
+        if isInsideSessions, FileManager.default.fileExists(atPath: sessionDir.path) {
             try? FileManager.default.removeItem(at: sessionDir)
         }
         

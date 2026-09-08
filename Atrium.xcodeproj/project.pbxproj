@@ -37,6 +37,7 @@
 		EE6F95F05411BBAD6405C85B /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79619B30A1DDFE5B01C1595A /* ClockAligner.swift */; };
 		EFD196975D3D7DFB8D0D08AB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D1FD8683C875BC80AC0364 /* ContentView.swift */; };
 		F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDE4BABAE0D1F9BFFA310AA /* TranscriptAligner.swift */; };
+		F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 		79619B30A1DDFE5B01C1595A /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
+		9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStoreDeletePathTests.swift; sourceTree = "<group>"; };
 		B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortformerDiarizer.swift; sourceTree = "<group>"; };
 		B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
 		B6EF119FF069B52545B0445F /* AtriumTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AtriumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -181,6 +183,7 @@
 			children = (
 				F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */,
 				515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */,
+				9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */,
 				C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */,
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
@@ -350,6 +353,7 @@
 			files = (
 				4B5B397FC03074ACF6578EFC /* ASREngineTextTests.swift in Sources */,
 				A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */,
+				F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */,
 				3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */,
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,

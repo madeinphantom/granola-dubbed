@@ -105,3 +105,29 @@ would have been written into transcripts and exports.
 itself a hypothesis. Never verify integration code against a stub you wrote:
 the stub encodes your assumptions, so it confirms them. Pull the real dependency
 even when the full app cannot be built, and run it on real input.
+
+## 2026-09-08 — Delete path could have wiped all of Application Support
+
+**What happened.** `AudioStore.delete` built the directory to remove from
+`meeting.audioMixRelativePath`:
+
+```swift
+appSupport.appendingPathComponent("Atrium/\(meeting.audioMixRelativePath)")
+          .deletingLastPathComponent()
+```
+
+For a normal meeting that path is `Sessions/<uuid>/session.m4a`, so this
+correctly resolves to the session directory. But `audioMixRelativePath` defaults
+to `""` on `Meeting`, and `"Atrium/" + ""` then `deletingLastPathComponent()`
+resolves to **Application Support itself** — `removeItem` would recursively
+delete every application's data on the Mac.
+
+Only one construction site sets the property, so the state was not reachable
+today. It was one careless `Meeting(...)` away from being reachable, and the
+blast radius was the user's whole machine.
+
+**How to apply.** Never derive a destructive path by trimming a string field
+whose empty value walks *up* the tree. Derive it from an identifier that cannot
+be empty, and add a containment check asserting the target is strictly inside
+the directory you own before calling `removeItem`. Treat every delete path as
+hostile input, including your own model's defaults.
