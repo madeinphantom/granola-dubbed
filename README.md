@@ -39,8 +39,9 @@ open Atrium.xcodeproj
 # ⌘R to build and run
 ```
 
-Requires a full Xcode install (not just Command Line Tools) — SwiftData's `@Model`
-macro and the WhisperKit SPM dependency are both resolved by Xcode.
+Requires a full Xcode install (not just Command Line Tools): SwiftData's
+`@Model` macro needs the `SwiftDataMacros` plugin, which ships only with Xcode.
+(WhisperKit itself resolves fine under plain SwiftPM.)
 
 Run the unit tests with:
 
@@ -94,11 +95,28 @@ The app runs with the hardened runtime and is **not** sandboxed (the CoreAudio
 process tap and aggregate-device APIs are unavailable inside the App Sandbox),
 so it is distributable via Developer ID but not the Mac App Store.
 
+## Release
+
+`scripts/release.sh` archives, signs, notarizes, staples, and verifies a
+Developer ID DMG. Copy `ExportOptions.plist.template` to `ExportOptions.plist`
+and set your team ID first, then store a notarytool profile:
+
+```bash
+xcrun notarytool store-credentials atrium-notary \
+  --apple-id YOU@example.com --team-id TEAMID --password APP_SPECIFIC_PASSWORD
+```
+
+CI (`.github/workflows/ci.yml`) builds and tests on every push.
+
 ## Status
 
 Working: dual capture (CoreAudio process tap + SCK fallback), session writing and
 muxing, WhisperKit transcription, energy-based You/Them attribution, transcript
 alignment, playback, and all four export formats.
+
+The ASR path is verified end-to-end against real WhisperKit on real audio:
+`openai_whisper-large-v3_turbo` transcribes with word-level timings and the
+transcript comes back free of Whisper's special tokens.
 
 Not yet implemented: neural diarization for splitting multiple remote speakers.
 `SortformerDiarizer` is scaffolding only — it loads a CoreML model if one is

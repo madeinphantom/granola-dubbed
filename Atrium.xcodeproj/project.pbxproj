@@ -16,6 +16,7 @@
 		3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */; };
 		4682D698E7465D91995563B5 /* RecPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6BDB428C05BD9641841942 /* RecPillView.swift */; };
 		49D1A12ECF2B7D873002AE55 /* AudioPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7977D9D541C7505CD04626 /* AudioPlayerViewModel.swift */; };
+		4B5B397FC03074ACF6578EFC /* ASREngineTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */; };
 		56C32024C2F1A502A6399630 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F49A288B57C46789C04E305 /* MenuBarView.swift */; };
 		5D54E07301823A180453CD28 /* SessionWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB5218EABB34A8C7C9490F2 /* SessionWriter.swift */; };
 		803F8F4AE190813373E2D55A /* AudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D3FBEFDCCF48A20DD74BCA /* AudioStore.swift */; };
@@ -80,6 +81,7 @@
 		DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
 		ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptAlignerTests.swift; sourceTree = "<group>"; };
+		F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASREngineTextTests.swift; sourceTree = "<group>"; };
 		FCC56F253DD12443ED83CABC /* SessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -177,6 +179,7 @@
 		9DFBF744FCAF6439C8363E54 /* AtriumTests */ = {
 			isa = PBXGroup;
 			children = (
+				F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */,
 				515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */,
 				C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */,
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
@@ -345,6 +348,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B5B397FC03074ACF6578EFC /* ASREngineTextTests.swift in Sources */,
 				A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */,
 				3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */,
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,

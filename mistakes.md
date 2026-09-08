@@ -77,3 +77,31 @@ gaps.
 a fixed quantum sized to the average production rate — there is no headroom to
 recover from jitter. Any lossy buffer must count what it discards and something
 must read that counter.
+
+## 2026-09-08 — "Needs Xcode" was half wrong, and the untested half hid four bugs
+
+**What happened.** I claimed the project could not be verified without Xcode.
+Only half true: SwiftData's `@Model` macro genuinely requires the
+`SwiftDataMacros` plugin that ships with Xcode, but **WhisperKit builds fine
+under plain SwiftPM**. Because I accepted the blanket claim, `ASREngine` was
+"verified" against a hand-written stub instead of the real library — and the
+stub agreed with whatever I wrote. Building it against actual WhisperKit found
+four bugs in ~40 lines:
+
+1. `progressInfo.progress` — no such member; the callback returns `Bool?`, not Void.
+2. `wordTimestamps` defaults to **false**, so `segment.words` was always nil.
+   Every meeting would have produced an empty transcript.
+3. `result?.segments` — overload resolution returned `[TranscriptionResult]`,
+   so only the first chunk would have been used.
+4. The model name `openai_whisper-large-v3-turbo` does not exist (the real one
+   uses an underscore: `..._turbo`), and an explicit name is used verbatim as a
+   download path with no validation or fallback.
+
+Running it on real audio then exposed a fifth: segment text arrives with raw
+Whisper special tokens (`<|startoftranscript|>`, `<|en|>`, `<|0.00|>`) that
+would have been written into transcripts and exports.
+
+**How to apply.** Test the blocking claim before accepting it — "I need X" is
+itself a hypothesis. Never verify integration code against a stub you wrote:
+the stub encodes your assumptions, so it confirms them. Pull the real dependency
+even when the full app cannot be built, and run it on real input.
