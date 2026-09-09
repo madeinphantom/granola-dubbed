@@ -99,8 +99,10 @@ so it is distributable via Developer ID but not the Mac App Store.
 
 Grab `Atrium.dmg` from the [latest release](../../releases/latest).
 
-These builds are **not notarized** (no Apple Developer certificate), so macOS
-quarantines them on download. After dragging Atrium to Applications:
+These builds are **not notarized**. No Apple Developer account is needed to
+build, publish, or run Atrium — this is the normal situation for an open-source
+Mac app. macOS just quarantines downloaded unsigned apps, so after dragging
+Atrium to Applications:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Atrium.app
@@ -108,6 +110,13 @@ xattr -dr com.apple.quarantine /Applications/Atrium.app
 
 Then right-click the app → **Open** → **Open**. Grant Microphone and Screen
 Recording when prompted.
+
+Because these builds are ad-hoc signed, macOS identifies the app by a hash that
+changes with every release. Privacy permissions are tied to that hash, so
+**after each update you may need to re-grant Microphone and Screen Recording**
+(System Settings → Privacy & Security). A Developer ID certificate would give
+the app a stable identity and remove both this and the quarantine step, but it
+is not required to use or distribute Atrium.
 
 ## Release
 
