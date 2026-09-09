@@ -155,3 +155,22 @@ grants permission the compiler would deny. If a stub cannot express the real
 constraints, treat everything that depends on it as unverified and get it onto
 real CI early — this is the second time in this project that a stub manufactured
 false confidence (see the WhisperKit entry).
+
+## 2026-09-09 — xcodegen silently reverted the entitlements file
+
+**What happened.** I edited `Atrium/Atrium.entitlements` to add
+`com.apple.security.device.audio-input`, and the commit claimed it. But
+`project.yml` declared `entitlements.path` with no `properties`, so **xcodegen
+regenerates that file as an empty `<dict/>` on every run** — wiping the edit.
+The commit captured the empty version, CI signed it faithfully, and the shipped
+DMG had no entitlements at all. Microphone capture would have failed at runtime
+on every user's machine.
+
+Only inspecting the actual downloaded artifact caught it:
+`codesign -d --entitlements :- Atrium.app` → `<dict></dict>`.
+
+**How to apply.** For generated projects, edit the *generator's* input
+(`project.yml`), never the generated output — the output is a build artifact and
+will be overwritten. And verify security-relevant settings on the **built,
+signed artifact**, not in the source tree: the release workflow now greps the
+signed app's entitlements and fails if `audio-input` is absent.

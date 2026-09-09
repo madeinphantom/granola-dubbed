@@ -21,7 +21,14 @@ targets:
         NSMicrophoneUsageDescription: "Atrium needs microphone access to record your voice during meetings."
         NSScreenCaptureUsageDescription: "Atrium needs screen recording access to capture system audio from your meetings."
     entitlements:
+      # Defined here rather than in the file itself: xcodegen regenerates the
+      # .entitlements file on every run and would overwrite hand edits.
       path: Atrium/Atrium.entitlements
+      properties:
+        # Required for mic capture. Sandbox stays off because the CoreAudio
+        # process-tap and aggregate-device APIs are unavailable inside it.
+        com.apple.security.device.audio-input: true
+        com.apple.security.app-sandbox: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.atrium.mac

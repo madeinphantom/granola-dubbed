@@ -70,7 +70,11 @@ jobs:
             --entitlements Atrium/Atrium.entitlements \
             "${{ steps.app.outputs.path }}"
           codesign --verify --verbose=2 "${{ steps.app.outputs.path }}"
-          codesign -d --entitlements - "${{ steps.app.outputs.path }}"
+          # Fail loudly rather than shipping a build that cannot record.
+          codesign -d --entitlements :- "${{ steps.app.outputs.path }}" > ents.plist 2>/dev/null
+          cat ents.plist
+          grep -q "com.apple.security.device.audio-input" ents.plist \
+            || { echo "error: audio-input entitlement missing from signed app" >&2; exit 1; }
 
       - name: Build DMG
         run: |
