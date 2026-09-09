@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build unsigned DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme Atrium \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO
+
+      # No Developer ID certificate is available, so the app is signed ad-hoc
+      # ("-"). It runs, but Gatekeeper will quarantine it on download; the
+      # release notes tell users how to open it.
+      - name: Build Release app (ad-hoc signed)
+        run: |
+          xcodebuild build \
+            -scheme Atrium \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/dd \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_HARDENED_RUNTIME=NO
+
+      - name: Locate app
+        id: app
+        run: |
+          APP=$(find build/dd/Build/Products/Release -maxdepth 1 -name "Atrium.app" | head -1)
+          if [ -z "$APP" ]; then echo "Atrium.app not found" >&2; exit 1; fi
+          echo "path=$APP" >> "$GITHUB_OUTPUT"
+          echo "Found: $APP"
+
+      # Sign ad-hoc so the entitlements are attached — without this the
+      # microphone entitlement is missing and recording fails at runtime.
+      # Hardened runtime is deliberately NOT enabled: it exists to satisfy
+      # notarization, and combined with an ad-hoc signature it only adds
+      # restrictions that can prevent the app from launching.
+      - name: Ad-hoc sign with entitlements
+        run: |
+          codesign --force --deep --sign - \
+            --entitlements Atrium/Atrium.entitlements \
+            "${{ steps.app.outputs.path }}"
+          codesign --verify --verbose=2 "${{ steps.app.outputs.path }}"
+          codesign -d --entitlements - "${{ steps.app.outputs.path }}"
+
+      - name: Build DMG
+        run: |
+          mkdir -p dist/dmg
+          cp -R "${{ steps.app.outputs.path }}" dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname "Atrium" -srcfolder dist/dmg \
+            -ov -format UDZO dist/Atrium.dmg
+          ls -la dist/
+
+      - name: Resolve tag
+        id: tag
+        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Local-first meeting recorder for macOS. Requires macOS 15+ on Apple Silicon.
+
+          ## Install
+
+          1. Download `Atrium.dmg` below, open it, drag **Atrium** to Applications.
+          2. This build is **not notarized** (no Apple Developer certificate), so
+             macOS will block it on first launch. To open it:
+
+          ```bash
+          xattr -dr com.apple.quarantine /Applications/Atrium.app
+          ```
+
+             Then right-click the app → **Open** → **Open**.
+
+          3. Grant **Microphone** and **Screen Recording** when prompted
+             (System Settings → Privacy & Security). Screen Recording is needed
+             for system-audio capture.
+
+          ## Testing it
+
+          Press ⌘R or use the menu bar waveform icon to record. After stopping,
+          transcription runs locally — the Whisper model (~950MB) downloads on
+          first use, so the first transcript takes a while.
+
+          Sessions are written to:
+          `~/Library/Application Support/Atrium/Sessions/<uuid>/`
+
+          Each contains `tracks/you.caf`, `tracks/them.caf`, `session.m4a`, and
+          `transcript.json`.
+
+          ## Known limitations
+
+          - Not notarized; see the quarantine step above.
+          - Multiple remote speakers are attributed as a single "Them" —
+            neural diarization is not implemented yet.
+          - Speaker attribution uses a fixed energy threshold that has not been
+            tuned against real calls.
+          NOTES
+
+          gh release create "${{ steps.tag.outputs.value }}" \
+            dist/Atrium.dmg \
+            --title "Atrium ${{ steps.tag.outputs.value }}" \
+            --notes-file notes.md \
+            --clobber || \
+          gh release upload "${{ steps.tag.outputs.value }}" dist/Atrium.dmg --clobber

@@ -95,10 +95,28 @@ The app runs with the hardened runtime and is **not** sandboxed (the CoreAudio
 process tap and aggregate-device APIs are unavailable inside the App Sandbox),
 so it is distributable via Developer ID but not the Mac App Store.
 
+## Download
+
+Grab `Atrium.dmg` from the [latest release](../../releases/latest).
+
+These builds are **not notarized** (no Apple Developer certificate), so macOS
+quarantines them on download. After dragging Atrium to Applications:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Atrium.app
+```
+
+Then right-click the app → **Open** → **Open**. Grant Microphone and Screen
+Recording when prompted.
+
 ## Release
 
-`scripts/release.sh` archives, signs, notarizes, staples, and verifies a
-Developer ID DMG. Copy `ExportOptions.plist.template` to `ExportOptions.plist`
+`.github/workflows/release.yml` builds an **unsigned** DMG on any `v*` tag (or
+via workflow_dispatch) and publishes it to GitHub Releases — no certificate
+required.
+
+For a properly notarized build, `scripts/release.sh` archives, signs, notarizes,
+staples, and verifies a Developer ID DMG. Copy `ExportOptions.plist.template` to `ExportOptions.plist`
 and set your team ID first, then store a notarytool profile:
 
 ```bash
