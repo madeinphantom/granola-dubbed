@@ -129,9 +129,13 @@ jobs:
             tuned against real calls.
           NOTES
 
-          gh release create "${{ steps.tag.outputs.value }}" \
-            dist/Atrium.dmg \
-            --title "Atrium ${{ steps.tag.outputs.value }}" \
-            --notes-file notes.md \
-            --clobber || \
-          gh release upload "${{ steps.tag.outputs.value }}" dist/Atrium.dmg --clobber
+          TAG="${{ steps.tag.outputs.value }}"
+          # `--clobber` is an upload flag, not a create flag: create the release
+          # if it does not exist yet, otherwise replace the existing asset.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/Atrium.dmg --clobber
+          else
+            gh release create "$TAG" dist/Atrium.dmg \
+              --title "Atrium $TAG" \
+              --notes-file notes.md
+          fi
