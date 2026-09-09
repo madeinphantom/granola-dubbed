@@ -8,6 +8,9 @@ packages:
   WhisperKit:
     url: https://github.com/argmaxinc/WhisperKit
     from: 0.9.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.6.0
 
 targets:
   Atrium:
@@ -18,6 +21,16 @@ targets:
       path: Atrium/Info.plist
       properties:
         LSUIElement: false
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Sparkle appcast. Served from the "latest" release assets so no
+        # GitHub Pages site is required; this URL always redirects to the
+        # newest published release.
+        SUFeedURL: "https://github.com/madeinphantom/granola-dubbed/releases/latest/download/appcast.xml"
+        SUEnableInstallerLauncherService: false
+        # Public half of the EdDSA keypair; the private key lives in the
+        # maintainer's login keychain and in the SPARKLE_PRIVATE_KEY secret.
+        SUPublicEDKey: "xu20n7vmRUS3AxPr06MkvulnTZGKXs6yq3LZZLq3mqs="
         NSMicrophoneUsageDescription: "Atrium needs microphone access to record your voice during meetings."
         NSScreenCaptureUsageDescription: "Atrium needs screen recording access to capture system audio from your meetings."
     entitlements:
@@ -32,6 +45,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.atrium.mac
+        MARKETING_VERSION: "0.3.0"
+        CURRENT_PROJECT_VERSION: "3"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         DEVELOPMENT_TEAM: "" # Needs to be configured by the user
         CODE_SIGN_STYLE: Automatic
@@ -39,6 +54,7 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
     dependencies:
       - package: WhisperKit
+      - package: Sparkle
 
   AtriumTests:
     type: bundle.unit-test

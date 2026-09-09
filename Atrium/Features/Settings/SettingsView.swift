@@ -19,9 +19,31 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var updater = UpdaterService.shared
+    @State private var automaticChecks = UpdaterService.shared.automaticallyChecksForUpdates
+
+    private var lastCheckDescription: String {
+        guard let date = updater.lastUpdateCheckDate else { return "Never" }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
 
     var body: some View {
         Form {
+            Section {
+                LabeledContent("Version", value: updater.currentVersion)
+                Toggle("Check for updates automatically", isOn: $automaticChecks)
+                    .onChange(of: automaticChecks) { _, newValue in
+                        updater.automaticallyChecksForUpdates = newValue
+                    }
+                LabeledContent("Last checked", value: lastCheckDescription)
+                Button("Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canCheckForUpdates)
+            } header: {
+                Text("Updates")
+            }
+
             Section {
                 Toggle("Ask before deleting a recording", isOn: $prefs.confirmBeforeDelete)
             } footer: {

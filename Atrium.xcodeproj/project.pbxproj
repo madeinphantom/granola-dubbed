@@ -10,6 +10,7 @@
 		0466DCC93F542DE6047EEAFD /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CED946FDB908F622AF9373D /* AudioRingBuffer.swift */; };
 		0742EB58387B957FEA318144 /* MicCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95003C6EC1997FE6A7F5115B /* MicCapture.swift */; };
 		0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */; };
+		1D1A3DF89DDDE1744ED93E00 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B883129BC8E94E1EAE003B /* UpdaterService.swift */; };
 		33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F762CD9318C85421E47AB36 /* PreferencesTests.swift */; };
 		34F3B3B462C4E79E9676BA50 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80350BDC19EC8D87E72747E9 /* AppState.swift */; };
 		36976187709AD5E90BDCF3E5 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6298A413D72C0FE87EAC2A87 /* Preferences.swift */; };
@@ -41,6 +42,7 @@
 		EFD196975D3D7DFB8D0D08AB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D1FD8683C875BC80AC0364 /* ContentView.swift */; };
 		F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDE4BABAE0D1F9BFFA310AA /* TranscriptAligner.swift */; };
 		F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */; };
+		F8F9EF320DEF41FF13E3B65D /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5EB26B49BC38FEC2338B56F3 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +87,7 @@
 		BAB5218EABB34A8C7C9490F2 /* SessionWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionWriter.swift; sourceTree = "<group>"; };
 		BE554720AF9902F7B3E23BDC /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAlignerTests.swift; sourceTree = "<group>"; };
+		C5B883129BC8E94E1EAE003B /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
 		CEDE4BABAE0D1F9BFFA310AA /* TranscriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptAligner.swift; sourceTree = "<group>"; };
 		DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
@@ -99,6 +102,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9BEDD5F1D50008FF3F1AA7B4 /* WhisperKit in Frameworks */,
+				F8F9EF320DEF41FF13E3B65D /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -120,6 +124,7 @@
 				E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */,
 				6298A413D72C0FE87EAC2A87 /* Preferences.swift */,
 				FCC56F253DD12443ED83CABC /* SessionController.swift */,
+				C5B883129BC8E94E1EAE003B /* UpdaterService.swift */,
 			);
 			path = Application;
 			sourceTree = "<group>";
@@ -262,6 +267,7 @@
 			name = Atrium;
 			packageProductDependencies = (
 				7C4BEC9F45E32692199F0A95 /* WhisperKit */,
+				5EB26B49BC38FEC2338B56F3 /* Sparkle */,
 			);
 			productName = Atrium;
 			productReference = 61996351FC0B85798284AB60 /* Atrium.app */;
@@ -310,6 +316,7 @@
 			mainGroup = 32E214F4B598DCDCD5DD6D5E;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				F887F8342AD907C00726CEF4 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				9650EC7BFDDF2C519992C74E /* XCRemoteSwiftPackageReference "WhisperKit" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -363,6 +370,7 @@
 				0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */,
 				EA91A4FF9A1D03A3B16A76E0 /* SystemAudioTap.swift in Sources */,
 				F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */,
+				1D1A3DF89DDDE1744ED93E00 /* UpdaterService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -415,6 +423,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -422,6 +431,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -435,6 +445,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -442,6 +453,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -624,9 +636,22 @@
 				minimumVersion = 0.9.0;
 			};
 		};
+		F887F8342AD907C00726CEF4 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5EB26B49BC38FEC2338B56F3 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F887F8342AD907C00726CEF4 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		7C4BEC9F45E32692199F0A95 /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9650EC7BFDDF2C519992C74E /* XCRemoteSwiftPackageReference "WhisperKit" */;

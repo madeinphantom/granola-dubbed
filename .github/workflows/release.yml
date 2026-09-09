@@ -85,6 +85,31 @@ jobs:
             -ov -format UDZO dist/Atrium.dmg
           ls -la dist/
 
+      # Sparkle appcast. Signing needs the EdDSA private key; without the
+      # secret the DMG still ships, just with no auto-update feed.
+      - name: Generate signed appcast
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_KEY" ]; then
+            echo "SPARKLE_PRIVATE_KEY secret not set — publishing DMG without an" \
+                 "appcast. In-app updates stay disabled until it is added."
+            exit 0
+          fi
+          SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData \
+            -path "*/artifacts/sparkle/Sparkle/bin" -type d 2>/dev/null | head -1)
+          if [ -z "$SPARKLE_BIN" ]; then
+            echo "error: Sparkle tools not found in DerivedData" >&2
+            exit 1
+          fi
+          echo "$SPARKLE_KEY" > /tmp/sparkle_priv.key
+          "$SPARKLE_BIN/generate_appcast" \
+            --ed-key-file /tmp/sparkle_priv.key \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag || github.ref_name }}/" \
+            dist/
+          rm -f /tmp/sparkle_priv.key
+          ls -la dist/
+
       - name: Resolve tag
         id: tag
         run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
@@ -138,8 +163,11 @@ jobs:
           # if it does not exist yet, otherwise replace the existing asset.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/Atrium.dmg --clobber
+            [ -f dist/appcast.xml ] && gh release upload "$TAG" dist/appcast.xml --clobber || true
           else
-            gh release create "$TAG" dist/Atrium.dmg \
+            ASSETS=(dist/Atrium.dmg)
+            [ -f dist/appcast.xml ] && ASSETS+=(dist/appcast.xml)
+            gh release create "$TAG" "${ASSETS[@]}" \
               --title "Atrium $TAG" \
               --notes-file notes.md
           fi

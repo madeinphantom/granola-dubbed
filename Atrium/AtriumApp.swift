@@ -5,6 +5,7 @@ import AppKit
 struct AtriumApp: App {
     @StateObject private var appState = AppState()
     @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var updater = UpdaterService.shared
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,14 @@ struct AtriumApp: App {
         .windowStyle(.titleBar)
         .defaultSize(width: 1180, height: 760)
         .commands {
+            // Sits directly under "About Atrium", where macOS users expect it.
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canCheckForUpdates)
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Start Recording") {
                     Task { await appState.sessionController.startRecording() }
