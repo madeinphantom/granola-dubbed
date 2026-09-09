@@ -6,7 +6,13 @@ import OSLog
 final class DualChannelAssigner {
     private let logger = Logger(subsystem: "app.atrium.infer", category: "DualChannelAssigner")
     
-    func assign(youTrackURL: URL, themTrackURL: URL, chunkSizeSeconds: TimeInterval = 0.5) throws -> [(start: TimeInterval, end: TimeInterval, speaker: String)] {
+    /// - Parameter energyThreshold: RMS level above which a track counts as
+    ///   active speech. Configurable in Settings because the right value
+    ///   depends on mic gain and call volume.
+    func assign(youTrackURL: URL,
+                themTrackURL: URL,
+                chunkSizeSeconds: TimeInterval = 0.5,
+                energyThreshold: Float = 0.01) throws -> [(start: TimeInterval, end: TimeInterval, speaker: String)] {
         guard let youFile = try? AVAudioFile(forReading: youTrackURL),
               let themFile = try? AVAudioFile(forReading: themTrackURL) else {
             return []
@@ -22,7 +28,6 @@ final class DualChannelAssigner {
         
         var segments: [(start: TimeInterval, end: TimeInterval, speaker: String)] = []
         var currentTime: TimeInterval = 0
-        let energyThreshold: Float = 0.01
         
         while youFile.framePosition < youFile.length && themFile.framePosition < themFile.length {
             try youFile.read(into: youBuffer, frameCount: frameCount)

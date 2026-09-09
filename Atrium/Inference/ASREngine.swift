@@ -14,9 +14,13 @@ final class ASREngine {
     /// underscore before `turbo`.
     static let modelVariant = "openai_whisper-large-v3_turbo"
 
+    /// Model variant to load. Defaults to the pinned variant but can be
+    /// overridden from Settings.
+    var modelOverride: String?
+
     func setup() async throws {
         // Loads model asynchronously. WhisperKit handles finding/downloading it.
-        whisperKit = try await WhisperKit(model: Self.modelVariant)
+        whisperKit = try await WhisperKit(model: modelOverride ?? Self.modelVariant)
     }
     
     func transcribe(audioURL: URL, progress: @escaping (Float) -> Void) async throws -> [TranscriptSegment] {

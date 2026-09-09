@@ -10,7 +10,9 @@
 		0466DCC93F542DE6047EEAFD /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CED946FDB908F622AF9373D /* AudioRingBuffer.swift */; };
 		0742EB58387B957FEA318144 /* MicCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95003C6EC1997FE6A7F5115B /* MicCapture.swift */; };
 		0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */; };
+		33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F762CD9318C85421E47AB36 /* PreferencesTests.swift */; };
 		34F3B3B462C4E79E9676BA50 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80350BDC19EC8D87E72747E9 /* AppState.swift */; };
+		36976187709AD5E90BDCF3E5 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6298A413D72C0FE87EAC2A87 /* Preferences.swift */; };
 		38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */; };
 		39DC5C0B756D63BABB01A958 /* DualCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05A481D5E5DCC7F416156E03 /* DualCaptureSession.swift */; };
 		3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */; };
@@ -32,6 +34,7 @@
 		CDA193BB27A26BB208D62C09 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FB878C5BA2616E77D02069 /* ASREngine.swift */; };
 		D068387DE82C47730D8DFD55 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE554720AF9902F7B3E23BDC /* Models.swift */; };
 		D6CFF80327BA7D28AF12FF07 /* AtriumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2523289F5715D177C7174D /* AtriumApp.swift */; };
+		DDD04F206F77EB9D9F06F17B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76AF1B107B3E57C4DBB81940 /* SettingsView.swift */; };
 		EA91A4FF9A1D03A3B16A76E0 /* SystemAudioTap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A6E2228711C7E02DA21426 /* SystemAudioTap.swift */; };
 		EB20A0C58535E9A921579B02 /* SessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCC56F253DD12443ED83CABC /* SessionController.swift */; };
 		EE6F95F05411BBAD6405C85B /* ClockAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79619B30A1DDFE5B01C1595A /* ClockAligner.swift */; };
@@ -52,6 +55,7 @@
 
 /* Begin PBXFileReference section */
 		05A481D5E5DCC7F416156E03 /* DualCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualCaptureSession.swift; sourceTree = "<group>"; };
+		0F762CD9318C85421E47AB36 /* PreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesTests.swift; sourceTree = "<group>"; };
 		1CED946FDB908F622AF9373D /* AudioRingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRingBuffer.swift; sourceTree = "<group>"; };
 		24638F750630307901676C34 /* SCKFallbackCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCKFallbackCapture.swift; sourceTree = "<group>"; };
 		24A6E2228711C7E02DA21426 /* SystemAudioTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTap.swift; sourceTree = "<group>"; };
@@ -68,6 +72,8 @@
 		52D1FD8683C875BC80AC0364 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5C7977D9D541C7505CD04626 /* AudioPlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerViewModel.swift; sourceTree = "<group>"; };
 		61996351FC0B85798284AB60 /* Atrium.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atrium.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6298A413D72C0FE87EAC2A87 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		76AF1B107B3E57C4DBB81940 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		79619B30A1DDFE5B01C1595A /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
@@ -112,6 +118,7 @@
 			children = (
 				DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */,
 				E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */,
+				6298A413D72C0FE87EAC2A87 /* Preferences.swift */,
 				FCC56F253DD12443ED83CABC /* SessionController.swift */,
 			);
 			path = Application;
@@ -149,6 +156,7 @@
 				33265D64C668EA0A7C70371E /* MenuBar */,
 				059591890B82C4FD171F6B3B /* Player */,
 				38E1CC552C796A7450A04E7A /* RecPill */,
+				AC9FD6FBBF8764D88D652AD9 /* Settings */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -186,10 +194,19 @@
 				9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */,
 				C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */,
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
+				0F762CD9318C85421E47AB36 /* PreferencesTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
 				ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */,
 			);
 			path = AtriumTests;
+			sourceTree = "<group>";
+		};
+		AC9FD6FBBF8764D88D652AD9 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				76AF1B107B3E57C4DBB81940 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		C768EDAC35A55AD89CCDA1CB /* Products */ = {
@@ -337,10 +354,12 @@
 				0742EB58387B957FEA318144 /* MicCapture.swift in Sources */,
 				D068387DE82C47730D8DFD55 /* Models.swift in Sources */,
 				82077619E5E635954D3E4D7C /* PermissionService.swift in Sources */,
+				36976187709AD5E90BDCF3E5 /* Preferences.swift in Sources */,
 				4682D698E7465D91995563B5 /* RecPillView.swift in Sources */,
 				BFB76B567929F547DDEC345B /* SCKFallbackCapture.swift in Sources */,
 				EB20A0C58535E9A921579B02 /* SessionController.swift in Sources */,
 				5D54E07301823A180453CD28 /* SessionWriter.swift in Sources */,
+				DDD04F206F77EB9D9F06F17B /* SettingsView.swift in Sources */,
 				0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */,
 				EA91A4FF9A1D03A3B16A76E0 /* SystemAudioTap.swift in Sources */,
 				F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */,
@@ -356,6 +375,7 @@
 				F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */,
 				3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */,
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,
+				33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
 				8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */,
 			);

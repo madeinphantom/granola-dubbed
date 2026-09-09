@@ -129,13 +129,18 @@ final class SessionController: ObservableObject {
             
             do {
                 logger.info("Starting offline ASR pipeline")
+                asrEngine.modelOverride = Preferences.shared.whisperModel.rawValue
                 let rawSegments = try await asrEngine.transcribe(audioURL: m4aPath) { progress in
                     DispatchQueue.main.async {
                         self.transcriptionProgress = progress
                     }
                 }
                 
-                let speakerTurns = try dualChannelAssigner.assign(youTrackURL: youPath, themTrackURL: themPath)
+                let speakerTurns = try dualChannelAssigner.assign(
+                    youTrackURL: youPath,
+                    themTrackURL: themPath,
+                    energyThreshold: Float(Preferences.shared.speakerSensitivity)
+                )
                 
                 let youSpeakerID = UUID()
                 let themSpeakerID = UUID()

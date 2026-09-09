@@ -27,10 +27,50 @@ struct MainAppView: View {
     @Query(sort: \Meeting.createdAt, order: .reverse) private var meetings: [Meeting]
     @State private var selectedMeetingID: UUID?
     @State private var searchText: String = ""
-    
+    @State private var pendingDeletion: Meeting?
+
     private var filteredMeetings: [Meeting] {
         if searchText.isEmpty { return meetings }
         return meetings.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    /// Sessions bucketed by recency so long archives stay scannable.
+    private var groupedMeetings: [(title: String, meetings: [Meeting])] {
+        let calendar = Calendar.current
+        var today: [Meeting] = []
+        var week: [Meeting] = []
+        var earlier: [Meeting] = []
+
+        for meeting in filteredMeetings {
+            if calendar.isDateInToday(meeting.createdAt) {
+                today.append(meeting)
+            } else if let days = calendar.dateComponents([.day], from: meeting.createdAt, to: .now).day, days < 7 {
+                week.append(meeting)
+            } else {
+                earlier.append(meeting)
+            }
+        }
+
+        return [("Today", today), ("Previous 7 Days", week), ("Earlier", earlier)]
+            .filter { !$0.1.isEmpty }
+    }
+
+    private func requestDelete(_ meeting: Meeting) {
+        if Preferences.shared.confirmBeforeDelete {
+            pendingDeletion = meeting
+        } else {
+            performDelete(meeting)
+        }
+    }
+
+    private func performDelete(_ meeting: Meeting) {
+        if selectedMeetingID == meeting.id { selectedMeetingID = nil }
+        AudioStore.shared.delete(meeting: meeting)
+    }
+
+    private var selectedMeeting: Meeting? {
+        guard let id = selectedMeetingID else { return nil }
+        return meetings.first { $0.id == id }
     }
     
     var body: some View {
@@ -40,9 +80,10 @@ struct MainAppView: View {
                 if appState.isRecording {
                     HStack(spacing: 8) {
                         Rectangle().fill(Color.red).frame(width: 6, height: 6)
-                        Text("RECORDING")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(.red)
+                        Text("Recording")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.red)
                         Spacer()
                     }
                     .padding(.horizontal, 16)
@@ -56,9 +97,10 @@ struct MainAppView: View {
                     HStack(spacing: 8) {
                         ProgressView(value: appState.sessionController.transcriptionProgress)
                             .tint(.white)
-                        Text("\(Int(appState.sessionController.transcriptionProgress * 100))%")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(Color(white: 0.5))
+                        Text("Transcribing \(Int(appState.sessionController.transcriptionProgress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -93,62 +135,106 @@ struct MainAppView: View {
                 }
                 
                 if filteredMeetings.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        Image(systemName: "waveform.badge.mic")
-                            .font(.system(size: 32))
-                            .foregroundColor(Color(white: 0.15))
-                        Text(searchText.isEmpty ? "NO SESSIONS" : "NO RESULTS")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(Color(white: 0.25))
-                        if searchText.isEmpty {
-                            Text("Start a new session from the\nmenu bar or press ⌘R")
-                                .font(.system(.caption2))
-                                .foregroundColor(Color(white: 0.2))
-                                .multilineTextAlignment(.center)
-                        }
-                        Spacer()
+                    ContentUnavailableView {
+                        Label(searchText.isEmpty ? "No Recordings" : "No Results",
+                              systemImage: searchText.isEmpty ? "waveform.badge.mic" : "magnifyingglass")
+                    } description: {
+                        Text(searchText.isEmpty
+                             ? "Press ⌘R or use the menu bar icon to record your first meeting."
+                             : "No recordings match “\(searchText)”.")
                     }
-                    .frame(maxWidth: .infinity)
                 } else {
                     List(selection: $selectedMeetingID) {
-                        ForEach(filteredMeetings) { meeting in
-                            SessionRow(meeting: meeting)
-                                .tag(meeting.id)
-                                .listRowBackground(
-                                    selectedMeetingID == meeting.id
-                                    ? Color(white: 0.1)
-                                    : Color.black
-                                )
-                                .contextMenu {
-                                    Button("Delete", role: .destructive) {
-                                        if selectedMeetingID == meeting.id {
-                                            selectedMeetingID = nil
+                        ForEach(groupedMeetings, id: \.title) { group in
+                            Section {
+                                ForEach(group.meetings) { meeting in
+                                    SessionRow(meeting: meeting)
+                                        .tag(meeting.id)
+                                        .listRowBackground(
+                                            selectedMeetingID == meeting.id
+                                            ? Color(white: 0.12)
+                                            : Color.clear
+                                        )
+                                        .contextMenu {
+                                            Button("Reveal in Finder") {
+                                                NSWorkspace.shared.activateFileViewerSelecting(
+                                                    [Preferences.shared.sessionsDirectory
+                                                        .appendingPathComponent(meeting.id.uuidString)]
+                                                )
+                                            }
+                                            Divider()
+                                            Button("Delete…", role: .destructive) {
+                                                requestDelete(meeting)
+                                            }
                                         }
-                                        AudioStore.shared.delete(meeting: meeting)
-                                    }
                                 }
+                            } header: {
+                                Text(group.title)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .scrollContentBackground(.hidden)
                     .background(Color.black)
                 }
             }
-            .searchable(text: $searchText, prompt: "Search meetings")
-            .navigationTitle("ARCHIVE")
+            .searchable(text: $searchText, prompt: "Search recordings")
+            .navigationTitle("Recordings")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        if appState.isRecording {
+                            appState.sessionController.stopRecording()
+                        } else {
+                            Task { await appState.sessionController.startRecording() }
+                        }
+                    } label: {
+                        Label(appState.isRecording ? "Stop" : "Record",
+                              systemImage: appState.isRecording ? "stop.fill" : "record.circle")
+                    }
+                    .help(appState.isRecording ? "Stop recording (⇧⌘R)" : "Start recording (⌘R)")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(role: .destructive) {
+                        if let meeting = selectedMeeting { requestDelete(meeting) }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(selectedMeeting == nil)
+                    .help("Delete the selected recording (⌫)")
+                }
+            }
+            .onDeleteCommand {
+                if let meeting = selectedMeeting { requestDelete(meeting) }
+            }
+            .confirmationDialog(
+                pendingDeletion.map { "Delete “\($0.title)”?" } ?? "Delete recording?",
+                isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let meeting = pendingDeletion { performDelete(meeting) }
+                    pendingDeletion = nil
+                }
+                Button("Cancel", role: .cancel) { pendingDeletion = nil }
+            } message: {
+                Text("The audio and transcript will be permanently removed from this Mac.")
+            }
         } detail: {
             if let id = selectedMeetingID,
                let meeting = meetings.first(where: { $0.id == id }) {
                 MeetingDetailView(meeting: meeting)
             } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 48))
-                        .foregroundColor(Color(white: 0.15))
-                    Text("AWAITING SELECTION")
-                        .font(.system(.headline, design: .monospaced))
-                        .foregroundColor(Color(white: 0.25))
-                }
+                ContentUnavailableView(
+                    "No Recording Selected",
+                    systemImage: "waveform",
+                    description: Text("Choose a recording from the list to read its transcript and play the audio.")
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
             }
@@ -171,42 +257,41 @@ struct MainAppView: View {
 
 struct SessionRow: View {
     let meeting: Meeting
-    
+
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(meeting.title)
-                    .font(.system(.subheadline, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(.system(.body, weight: .medium))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
-                
-                HStack(spacing: 8) {
-                    Text(dateFormatter.string(from: meeting.createdAt))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundColor(Color(white: 0.4))
-                    
+
+                HStack(spacing: 6) {
+                    Text(meeting.createdAt, style: .time)
                     if meeting.duration > 0 {
-                        Text("//")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(Color(white: 0.2))
+                        Text("·")
                         Text(formatDuration(meeting.duration))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(Color(white: 0.4))
+                    }
+                    if meeting.speakers.count > 1 {
+                        Text("·")
+                        Text("^[\(meeting.speakers.count) speaker](inflect: true)")
                     }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            
-            Spacer()
-            
+
+            Spacer(minLength: 8)
+
             StateIndicator(state: meeting.state)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
     }
-    
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         let m = Int(duration) / 60
         let s = Int(duration) % 60
-        return String(format: "%02d:%02d", m, s)
+        return String(format: "%d:%02d", m, s)
     }
 }
 
@@ -214,22 +299,36 @@ struct SessionRow: View {
 
 struct StateIndicator: View {
     let state: MeetingState
-    
+
     var body: some View {
-        Text(state.rawValue.uppercased())
-            .font(.system(.caption2, design: .monospaced))
-            .foregroundColor(stateColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .border(stateColor.opacity(0.3), width: 1)
+        // "Ready" is the normal resting state; badging every row with it is
+        // noise, so only surface states that need attention.
+        if state != .ready {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(tint.opacity(0.15), in: Capsule())
+                .foregroundStyle(tint)
+        }
     }
-    
-    private var stateColor: Color {
+
+    private var label: String {
+        switch state {
+        case .recording: return "Recording"
+        case .processing: return "Transcribing"
+        case .ready: return "Ready"
+        case .failed: return "Failed"
+        }
+    }
+
+    private var tint: Color {
         switch state {
         case .recording: return .red
-        case .processing: return Color(white: 0.6)
+        case .processing: return .orange
         case .ready: return .green
-        case .failed: return Color(red: 1, green: 0.4, blue: 0.4)
+        case .failed: return .red
         }
     }
 }
@@ -311,10 +410,13 @@ struct MeetingDetailView: View {
                                 TranscriptRow(
                                     segment: segment,
                                     speakers: meeting.speakers,
+                                    isActive: playerVM.currentTime >= segment.start
+                                              && playerVM.currentTime < segment.end,
                                     onTap: {
                                         playerVM.seek(to: segment.start)
                                     }
                                 )
+                                .id(segment.id)
                             }
                         }
                         .padding(20)
@@ -391,18 +493,16 @@ struct MeetingDetailView: View {
                                 Button(action: { playerVM.seek(to: max(0, playerVM.currentTime - 15)) }) {
                                     Image(systemName: "gobackward.15")
                                         .font(.title3)
-                                        .foregroundColor(Color(white: 0.6))
+                                        .foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
                                 
                                 Button(action: { playerVM.togglePlayback() }) {
-                                    Text(playerVM.isPlaying ? "HALT" : "PLAY")
-                                        .font(.system(.headline, design: .monospaced))
-                                        .tracking(1)
-                                        .frame(width: 100, height: 36)
-                                        .border(Color.white, width: 1)
-                                        .background(playerVM.isPlaying ? Color.white : Color.clear)
-                                        .foregroundColor(playerVM.isPlaying ? .black : .white)
+                                    Image(systemName: playerVM.isPlaying ? "pause.fill" : "play.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.black)
+                                        .frame(width: 52, height: 52)
+                                        .background(.white, in: Circle())
                                 }
                                 .buttonStyle(.plain)
                                 .keyboardShortcut(.space, modifiers: [])
@@ -410,7 +510,7 @@ struct MeetingDetailView: View {
                                 Button(action: { playerVM.seek(to: min(playerVM.duration, playerVM.currentTime + 30)) }) {
                                     Image(systemName: "goforward.30")
                                         .font(.title3)
-                                        .foregroundColor(Color(white: 0.6))
+                                        .foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -504,46 +604,69 @@ struct WaveformBars: View {
 struct TranscriptRow: View {
     let segment: TranscriptSegment
     let speakers: [Speaker]
+    var isActive: Bool = false
     let onTap: () -> Void
-    
-    private var speakerLabel: String {
-        speakers.first(where: { $0.id == segment.speakerId })?.label ?? "Unknown"
+
+    @State private var isHovering = false
+
+    private var speaker: Speaker? {
+        speakers.first { $0.id == segment.speakerId }
     }
-    
-    private var isYou: Bool {
-        speakers.first(where: { $0.id == segment.speakerId })?.isLocalUser ?? false
-    }
-    
+
+    private var speakerLabel: String { speaker?.label ?? "Unknown" }
+    private var isYou: Bool { speaker?.isLocalUser ?? false }
+
+    /// Distinct colours so the two sides of a conversation are separable at a
+    /// glance without reading the labels.
+    private var speakerTint: Color { isYou ? .cyan : .orange }
+
     var body: some View {
         Button(action: onTap) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(formatTime(segment.start))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundColor(Color(white: 0.35))
-                    Text(speakerLabel.uppercased())
-                        .font(.system(.caption2, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(isYou ? Color.white : Color(white: 0.55))
+            HStack(alignment: .top, spacing: 14) {
+                Rectangle()
+                    .fill(speakerTint.opacity(isActive ? 0.9 : 0.35))
+                    .frame(width: 2)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Text(speakerLabel)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(speakerTint)
+                        Text(formatTime(segment.start))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .monospacedDigit()
+                    }
+
+                    Text(segment.text)
+                        .font(.body)
+                        .foregroundStyle(isActive ? .primary : .secondary)
+                        .lineSpacing(4)
+                        .multilineTextAlignment(.leading)
+                        .textSelection(.enabled)
                 }
-                .frame(width: 70, alignment: .leading)
-                
-                Text(segment.text)
-                    .font(.system(.body))
-                    .foregroundColor(Color(white: 0.85))
-                    .lineSpacing(5)
-                    .multilineTextAlignment(.leading)
-                
-                Spacer()
+
+                Spacer(minLength: 0)
             }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isActive ? speakerTint.opacity(0.10)
+                                   : (isHovering ? Color.white.opacity(0.04) : .clear))
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("Jump to \(formatTime(segment.start))")
     }
-    
+
     private func formatTime(_ t: TimeInterval) -> String {
         let m = Int(t) / 60
         let s = Int(t) % 60
-        return String(format: "%02d:%02d", m, s)
+        return String(format: "%d:%02d", m, s)
     }
 }
 
