@@ -237,7 +237,10 @@ struct StateIndicator: View {
 // MARK: - Meeting Detail
 
 struct MeetingDetailView: View {
-    @ObservedObject var meeting: Meeting
+    // SwiftData's @Model conforms to Observable, not ObservableObject, so
+    // @ObservedObject does not apply. Observation is automatic; no wrapper
+    // is needed since nothing here binds to $meeting.
+    let meeting: Meeting
     @State private var notes: String = ""
     @State private var transcript: TranscriptDocument?
     @StateObject private var playerVM = AudioPlayerViewModel()

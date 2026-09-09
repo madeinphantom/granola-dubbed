@@ -131,3 +131,27 @@ whose empty value walks *up* the tree. Derive it from an identifier that cannot
 be empty, and add a containment check asserting the target is strictly inside
 the directory you own before calling `removeItem`. Treat every delete path as
 hostile input, including your own model's defaults.
+
+## 2026-09-09 — A stub that was "close enough" hid a build-breaking error
+
+**What happened.** CI failed with:
+
+```
+ContentView.swift:240: error: generic struct 'ObservedObject' requires that
+'Meeting' conform to 'ObservableObject'
+```
+
+`@ObservedObject var meeting: Meeting` is wrong for a SwiftData model: `@Model`
+expands to `Observable` + `PersistentModel`, never `ObservableObject`. My local
+shim stripped `@Model` down to a **plain class**, which happens to satisfy
+`ObservedObject`'s constraint — so the shim accepted code the real macro
+rejects.
+
+Changing the shim to `@Observable` reproduced the failure locally.
+
+**How to apply.** When stubbing a macro or dependency, model its *conformances*,
+not just its shape. A stub that is more permissive than the real thing silently
+grants permission the compiler would deny. If a stub cannot express the real
+constraints, treat everything that depends on it as unverified and get it onto
+real CI early — this is the second time in this project that a stub manufactured
+false confidence (see the WhisperKit entry).
