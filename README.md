@@ -120,9 +120,33 @@ is not required to use or distribute Atrium.
 
 ## Updates
 
-Atrium checks for updates on launch and via **Atrium ▸ Check for Updates…**
-(also in Settings ▸ General). Updates are delivered by
-[Sparkle](https://sparkle-project.org) and install in place.
+### From the terminal
+
+```bash
+./scripts/install-cli.sh   # once
+atrium update              # thereafter
+```
+
+`atrium update` pulls the latest commits, rebuilds, and installs to
+`/Applications`. Other commands:
+
+| Command | Does |
+|---|---|
+| `atrium update` | Pull, rebuild, install |
+| `atrium download` | Install the prebuilt release (no Xcode needed) |
+| `atrium build` | Rebuild without pulling |
+| `atrium status` | Show installed vs available version |
+| `atrium open` | Launch Atrium |
+
+`atrium update` needs full Xcode. On a Mac without it, `atrium download` grabs
+the released DMG instead.
+
+### From inside the app
+
+Atrium also checks on launch and via **Atrium ▸ Check for Updates…** (also in
+Settings ▸ General), delivered by [Sparkle](https://sparkle-project.org). This
+is for people who install the DMG rather than cloning the repo, and stays
+inactive until the maintainer sets `SPARKLE_PRIVATE_KEY` (see below).
 
 Because these builds are ad-hoc signed, each update changes the app's code
 signature, so **macOS will ask you to re-grant Microphone and Screen Recording

@@ -1,0 +1,158 @@
+#!/bin/bash
+# Update Atrium: pull the latest source, rebuild, install to /Applications.
+#
+# Install once with:  ./scripts/install-cli.sh
+# Then just run:      atrium update
+set -euo pipefail
+
+REPO="${ATRIUM_REPO:-$HOME/GitHub/granola-dubbed}"
+APP="/Applications/Atrium.app"
+
+cyan() { printf "\033[36m%s\033[0m\n" "$1"; }
+green() { printf "\033[32m%s\033[0m\n" "$1"; }
+red() { printf "\033[31m%s\033[0m\n" "$1" >&2; }
+
+cmd_update() {
+  [ -d "$REPO/.git" ] || { red "No git repo at $REPO. Set ATRIUM_REPO."; exit 1; }
+  cd "$REPO"
+
+  cyan "==> Fetching latest"
+  local before after
+  before=$(git rev-parse HEAD)
+  git pull --ff-only
+  after=$(git rev-parse HEAD)
+
+  if [ "$before" = "$after" ] && [ -d "$APP" ]; then
+    green "Already up to date ($(git log -1 --format=%h))."
+    exit 0
+  fi
+
+  if [ "$before" != "$after" ]; then
+    cyan "==> Changes"
+    git log --oneline "$before..$after" | sed 's/^/    /'
+  fi
+
+  cmd_build
+}
+
+cmd_build() {
+  cd "$REPO"
+  command -v xcodegen >/dev/null || { red "xcodegen missing: brew install xcodegen"; exit 1; }
+
+  # Building needs full Xcode: SwiftData's @Model macro plugin ships only with
+  # Xcode, not the Command Line Tools.
+  if ! xcodebuild -version >/dev/null 2>&1; then
+    red "xcodebuild is not usable."
+    if [ -d /Applications/Xcode.app ]; then
+      red "Xcode is installed but not selected. Fix with:"
+      red "    sudo xcode-select -s /Applications/Xcode.app"
+    else
+      red "Full Xcode is required (Command Line Tools alone cannot build"
+      red "SwiftData's @Model macro). Install Xcode, then run this again."
+      red ""
+      red "Or just download the prebuilt app instead:"
+      red "    atrium download"
+    fi
+    exit 1
+  fi
+
+  cyan "==> Generating project"
+  xcodegen generate >/dev/null
+
+  cyan "==> Building (this takes a minute)"
+  xcodebuild build \
+    -scheme Atrium \
+    -configuration Release \
+    -destination 'platform=macOS' \
+    -derivedDataPath "$REPO/.build-xcode" \
+    CODE_SIGN_IDENTITY="-" \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGNING_ALLOWED=NO \
+    ENABLE_HARDENED_RUNTIME=NO \
+    -quiet
+
+  local built="$REPO/.build-xcode/Build/Products/Release/Atrium.app"
+  [ -d "$built" ] || { red "Build produced no app bundle."; exit 1; }
+
+  # Sign ad-hoc with entitlements, or the mic permission is missing at runtime.
+  codesign --force --deep --sign - \
+    --entitlements "$REPO/Atrium/Atrium.entitlements" \
+    "$built" 2>/dev/null
+
+  if pgrep -x Atrium >/dev/null; then
+    cyan "==> Quitting running Atrium"
+    osascript -e 'quit app "Atrium"' 2>/dev/null || true
+    sleep 2
+  fi
+
+  cyan "==> Installing to $APP"
+  rm -rf "$APP"
+  cp -R "$built" "$APP"
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+
+  local version
+  version=$(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "?")
+  green "Atrium $version installed."
+  echo "   Launch it with: atrium open"
+}
+
+# Install the prebuilt release instead of compiling. Useful on any Mac that
+# does not have Xcode.
+cmd_download() {
+  command -v gh >/dev/null || { red "gh missing: brew install gh"; exit 1; }
+  local tmp; tmp=$(mktemp -d)
+  cyan "==> Downloading latest release"
+  gh release download --repo madeinphantom/granola-dubbed \
+     --pattern "Atrium.dmg" --dir "$tmp" --clobber
+  cyan "==> Mounting"
+  hdiutil attach "$tmp/Atrium.dmg" -nobrowse -mountpoint "$tmp/mnt" >/dev/null
+
+  if pgrep -x Atrium >/dev/null; then
+    osascript -e 'quit app "Atrium"' 2>/dev/null || true
+    sleep 2
+  fi
+
+  cyan "==> Installing to $APP"
+  rm -rf "$APP"
+  cp -R "$tmp/mnt/Atrium.app" "$APP"
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+  hdiutil detach "$tmp/mnt" >/dev/null 2>&1 || true
+  rm -rf "$tmp"
+
+  local version
+  version=$(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "?")
+  green "Atrium $version installed."
+}
+
+cmd_open()   { open -a "$APP"; }
+cmd_status() {
+  cd "$REPO"
+  echo "Repo:      $REPO"
+  echo "Branch:    $(git rev-parse --abbrev-ref HEAD)"
+  echo "Commit:    $(git log -1 --format='%h  %s')"
+  if [ -d "$APP" ]; then
+    echo "Installed: $(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)"
+  else
+    echo "Installed: not installed"
+  fi
+  git fetch -q origin 2>/dev/null || true
+  local behind
+  behind=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+  [ "$behind" -gt 0 ] && cyan "$behind new commit(s) available — run: atrium update" || green "Up to date."
+}
+
+case "${1:-update}" in
+  update)   cmd_update ;;
+  build)    cmd_build ;;
+  download) cmd_download ;;
+  open)    cmd_open ;;
+  status)  cmd_status ;;
+  *)
+    echo "Usage: atrium [update|download|build|open|status]"
+    echo "  update    Pull latest source, rebuild, install (default)"
+    echo "  download  Install the prebuilt release (no Xcode needed)"
+    echo "  build     Rebuild and install without pulling"
+    echo "  open    Launch Atrium"
+    echo "  status  Show installed vs available version"
+    ;;
+esac
