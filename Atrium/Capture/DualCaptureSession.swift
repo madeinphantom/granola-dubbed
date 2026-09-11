@@ -12,6 +12,9 @@ final class DualCaptureSession {
     // We assume 48kHz stereo for system tap, mono for mic.
     private let tapRingBuffer = AudioRingBuffer(capacityFrames: 48000 * 10, channels: 2) // 10 seconds buffer
     private let micRingBuffer = AudioRingBuffer(capacityFrames: 48000 * 10, channels: 1)
+
+    /// Scratch space for folding multi-channel voice-processed mic input to mono.
+    private var micDownmixBuffer: [Float] = []
     
     let sessionID = UUID()
     
@@ -111,9 +114,36 @@ final class DualCaptureSession {
     
     private func handleMicAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         guard let channelData = buffer.floatChannelData else { return }
-        let data = channelData[0]
         let frameCount = Int(buffer.frameLength)
-        micRingBuffer.write(data: data, count: frameCount)
+        guard frameCount > 0 else { return }
+
+        let channels = Int(buffer.format.channelCount)
+
+        // you.caf is written as mono. Voice processing can hand back a
+        // multi-channel buffer (9ch on built-in mics), so fold it down rather
+        // than assuming channel 0 alone represents the microphone.
+        if channels <= 1 {
+            micRingBuffer.write(data: channelData[0], count: frameCount)
+            return
+        }
+
+        if micDownmixBuffer.count < frameCount {
+            micDownmixBuffer = [Float](repeating: 0, count: frameCount)
+        }
+        let scale = 1.0 / Float(channels)
+        micDownmixBuffer.withUnsafeMutableBufferPointer { out in
+            for frame in 0..<frameCount { out[frame] = 0 }
+            for ch in 0..<channels {
+                let src = channelData[ch]
+                for frame in 0..<frameCount {
+                    out[frame] += src[frame] * scale
+                }
+            }
+        }
+        micDownmixBuffer.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { return }
+            micRingBuffer.write(data: base, count: frameCount)
+        }
     }
     
     // SCK fallback handlers — extract float samples from CMSampleBuffer

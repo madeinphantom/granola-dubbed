@@ -227,3 +227,32 @@ permission before suspecting format or configuration — TCC-gated media APIs
 routinely degrade to silence/black frames rather than erroring. And an
 unreferenced permission check is not a permission check: grep for call sites,
 not just definitions.
+
+## 2026-09-11 — Voice processing changes the input format; reading it first loses 83% of the mic
+
+**What happened.** With system audio finally working, a ~6 minute recording
+produced `them.caf` at 370.15s (correct) and `you.caf` at 61.4s — a 6x
+discrepancy. The tap was measured at 0.97x real time, so capture was fine.
+
+`MicCapture` did:
+
+```swift
+let format = input.inputFormat(forBus: 0)      // read FIRST
+try input.setVoiceProcessingEnabled(true)      // then enabled
+input.installTap(onBus: 0, bufferSize: 1024, format: format) { ... }
+```
+
+Enabling voice processing **changes the input node's format**: measured 1ch
+before, **9ch after** on the built-in mic. The tap was installed with the stale
+1-channel format, and `handleMicAudio` read only `channelData[0]`, so most of
+the microphone audio never reached the ring buffer.
+
+Fix: enable voice processing first, read the format after, and downmix
+multi-channel input to mono. Verified 1.00x real time over a steady-state
+window.
+
+**How to apply.** Configuring an audio node can renegotiate its format. Always
+read the format *after* every configuration call, never before. And when two
+parallel tracks of the same recording disagree in duration, measure each
+capture path independently — the shorter one is not necessarily the broken one,
+but the ratio points straight at a channel-count or sample-rate assumption.

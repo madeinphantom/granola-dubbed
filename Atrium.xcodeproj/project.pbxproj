@@ -17,6 +17,7 @@
 		38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */; };
 		39DC5C0B756D63BABB01A958 /* DualCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05A481D5E5DCC7F416156E03 /* DualCaptureSession.swift */; };
 		3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */; };
+		4216753D13B5A29475B04FC5 /* MicCaptureFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 285EB19798D2123E98732E8F /* MicCaptureFormatTests.swift */; };
 		4682D698E7465D91995563B5 /* RecPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6BDB428C05BD9641841942 /* RecPillView.swift */; };
 		49D1A12ECF2B7D873002AE55 /* AudioPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7977D9D541C7505CD04626 /* AudioPlayerViewModel.swift */; };
 		4B5B397FC03074ACF6578EFC /* ASREngineTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */; };
@@ -63,6 +64,7 @@
 		24638F750630307901676C34 /* SCKFallbackCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCKFallbackCapture.swift; sourceTree = "<group>"; };
 		24A6E2228711C7E02DA21426 /* SystemAudioTap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTap.swift; sourceTree = "<group>"; };
 		280B4C5AE2452358D9BB254A /* DualChannelAssigner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualChannelAssigner.swift; sourceTree = "<group>"; };
+		285EB19798D2123E98732E8F /* MicCaptureFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCaptureFormatTests.swift; sourceTree = "<group>"; };
 		29D98BB60E8D243EB13AD135 /* Atrium.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Atrium.entitlements; sourceTree = "<group>"; };
 		2C2523289F5715D177C7174D /* AtriumApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtriumApp.swift; sourceTree = "<group>"; };
 		2F49A288B57C46789C04E305 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
@@ -201,6 +203,7 @@
 				9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */,
 				C2FFA8963B283D522F546A21 /* ClockAlignerTests.swift */,
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
+				285EB19798D2123E98732E8F /* MicCaptureFormatTests.swift */,
 				0F762CD9318C85421E47AB36 /* PreferencesTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
 				9F1D0AB08E2EAE7BF8C243D4 /* SystemAudioTapTests.swift */,
@@ -386,6 +389,7 @@
 				F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */,
 				3D8969AC94B2507EE91903A8 /* ClockAlignerTests.swift in Sources */,
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,
+				4216753D13B5A29475B04FC5 /* MicCaptureFormatTests.swift in Sources */,
 				33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
 				BC997576AE3EE5F39678856F /* SystemAudioTapTests.swift in Sources */,
@@ -427,7 +431,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -435,7 +439,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.3.2;
+				MARKETING_VERSION = 0.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -449,7 +453,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -457,7 +461,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.3.2;
+				MARKETING_VERSION = 0.3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;

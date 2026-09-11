@@ -45,8 +45,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.atrium.mac
-        MARKETING_VERSION: "0.3.2"
-        CURRENT_PROJECT_VERSION: "5"
+        MARKETING_VERSION: "0.3.3"
+        CURRENT_PROJECT_VERSION: "6"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         DEVELOPMENT_TEAM: "" # Needs to be configured by the user
         CODE_SIGN_STYLE: Automatic
