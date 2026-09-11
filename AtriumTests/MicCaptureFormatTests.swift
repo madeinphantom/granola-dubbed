@@ -13,7 +13,13 @@ final class MicCaptureFormatTests: XCTestCase {
         let input = engine.inputNode
         let before = input.inputFormat(forBus: 0)
 
-        try XCTSkipUnless(before.sampleRate > 0, "No audio input device on this host")
+        // CI runners have no audio input; enabling voice processing there can
+        // block, so require a real device before touching it.
+        try XCTSkipUnless(before.sampleRate > 0 && before.channelCount > 0,
+                          "No audio input device on this host")
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == nil,
+                          "Skipped on CI: no audio hardware")
+
         try input.setVoiceProcessingEnabled(true)
         defer { try? input.setVoiceProcessingEnabled(false) }
 
