@@ -30,6 +30,7 @@
 		9BEDD5F1D50008FF3F1AA7B4 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7C4BEC9F45E32692199F0A95 /* WhisperKit */; };
 		A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */; };
 		AE981FE1B3FBB0A386E9669A /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */; };
+		BC997576AE3EE5F39678856F /* SystemAudioTapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1D0AB08E2EAE7BF8C243D4 /* SystemAudioTapTests.swift */; };
 		BFB76B567929F547DDEC345B /* SCKFallbackCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24638F750630307901676C34 /* SCKFallbackCapture.swift */; };
 		C7066FCDE41AFE6CC8227FD7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30245E25CBC344490C1E0F3F /* Assets.xcassets */; };
 		CDA193BB27A26BB208D62C09 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FB878C5BA2616E77D02069 /* ASREngine.swift */; };
@@ -80,6 +81,7 @@
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
 		9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStoreDeletePathTests.swift; sourceTree = "<group>"; };
+		9F1D0AB08E2EAE7BF8C243D4 /* SystemAudioTapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioTapTests.swift; sourceTree = "<group>"; };
 		B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortformerDiarizer.swift; sourceTree = "<group>"; };
 		B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
 		B6EF119FF069B52545B0445F /* AtriumTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AtriumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -201,6 +203,7 @@
 				B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */,
 				0F762CD9318C85421E47AB36 /* PreferencesTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
+				9F1D0AB08E2EAE7BF8C243D4 /* SystemAudioTapTests.swift */,
 				ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */,
 			);
 			path = AtriumTests;
@@ -385,6 +388,7 @@
 				38705EFCAEB3CE0753D707F5 /* ExportServiceTests.swift in Sources */,
 				33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
+				BC997576AE3EE5F39678856F /* SystemAudioTapTests.swift in Sources */,
 				8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

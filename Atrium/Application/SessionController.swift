@@ -118,10 +118,26 @@ final class SessionController: ObservableObject {
             try? audioStore.container.mainContext.save()
             
             self.activeSession = nil
+            await runTranscriptionPipeline(for: meeting, sessionID: session.sessionID)
+        }
+    }
+
+    /// Re-runs transcription for an already-recorded session.
+    ///
+    /// Recordings whose audio survived but whose pipeline failed are worth
+    /// salvaging rather than discarding — the audio cannot be recaptured.
+    func retryTranscription(for meeting: Meeting) async {
+        guard !isTranscribing else { return }
+        meeting.state = .processing
+        try? audioStore.container.mainContext.save()
+        await runTranscriptionPipeline(for: meeting, sessionID: meeting.id)
+    }
+
+    private func runTranscriptionPipeline(for meeting: Meeting, sessionID: UUID) async {
             self.isTranscribing = true
-            
+
             let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let sessionDir = appSupport.appendingPathComponent("Atrium/Sessions/\(session.sessionID.uuidString)")
+            let sessionDir = appSupport.appendingPathComponent("Atrium/Sessions/\(sessionID.uuidString)")
             let m4aPath = sessionDir.appendingPathComponent("session.m4a")
             let youPath = sessionDir.appendingPathComponent("tracks/you.caf")
             let themPath = sessionDir.appendingPathComponent("tracks/them.caf")
@@ -179,6 +195,5 @@ final class SessionController: ObservableObject {
             self.transcriptionProgress = 0.0
             self.activeMeeting = nil
             try? audioStore.container.mainContext.save()
-        }
     }
 }

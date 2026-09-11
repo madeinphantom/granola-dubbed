@@ -52,9 +52,38 @@ final class SystemAudioTap {
         return uid
     }
 
+    /// Translates a Unix pid into the AudioObjectID of its audio process.
+    ///
+    /// `CATapDescription` takes AudioObjectIDs, not pids. Passing a raw pid
+    /// makes `AudioHardwareCreateProcessTap` fail with
+    /// `kAudioHardwareBadObjectError` ('!obj') and no system audio is ever
+    /// captured. A process that has never played audio has no audio object,
+    /// which is not an error — there is simply nothing to exclude.
+    private func audioObjectID(forPID pid: pid_t) -> AudioObjectID? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var inputPID = pid
+        var objectID = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            UInt32(MemoryLayout<pid_t>.size),
+            &inputPID,
+            &size,
+            &objectID
+        )
+        guard status == noErr, objectID != kAudioObjectUnknown else { return nil }
+        return objectID
+    }
+
     func start(excludingPids: [pid_t] = [pid_t(getpid())],
               handler: @escaping (UnsafePointer<AudioBufferList>, UInt32, AudioTimeStamp) -> Void) throws {
-        let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: excludingPids.map { AudioObjectID($0) })
+        let excludedObjects = excludingPids.compactMap { audioObjectID(forPID: $0) }
+        let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: excludedObjects)
         desc.uuid = UUID()
         desc.name = "Atrium System Tap"
         desc.isPrivate = true

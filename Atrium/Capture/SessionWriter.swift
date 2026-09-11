@@ -2,9 +2,27 @@ import Foundation
 import AVFoundation
 import OSLog
 
-enum SessionWriterError: Error {
+enum SessionWriterError: LocalizedError {
     case missingIncompleteMarker
     case cannotCreateFile(String)
+    case noAudioCaptured
+    case exportUnavailable
+    case exportProducedNoFile
+
+    var errorDescription: String? {
+        switch self {
+        case .missingIncompleteMarker:
+            return "Session marker missing."
+        case .cannotCreateFile(let name):
+            return "Could not create \(name)."
+        case .noAudioCaptured:
+            return "No audio was captured. Check microphone and screen-recording permissions in System Settings > Privacy & Security."
+        case .exportUnavailable:
+            return "Could not create the audio export session."
+        case .exportProducedNoFile:
+            return "Audio export finished but produced no file."
+        }
+    }
 }
 
 final class SessionWriter {
@@ -121,25 +139,53 @@ final class SessionWriter {
     
     private func muxToM4A() async throws {
         let composition = AVMutableComposition()
-        let youAsset = AVURLAsset(url: youTrackURL)
-        let themAsset = AVURLAsset(url: themTrackURL)
-        
-        guard let youTrack = try await youAsset.loadTracks(withMediaType: .audio).first,
-              let themTrack = try await themAsset.loadTracks(withMediaType: .audio).first else { return }
-              
-        let compYouTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-        let compThemTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-        
-        let youDuration = try await youAsset.load(.duration)
-        let themDuration = try await themAsset.load(.duration)
-        
-        try compYouTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: youDuration), of: youTrack, at: .zero)
-        try compThemTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: themDuration), of: themTrack, at: .zero)
-        
-        guard let exportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else { return }
+
+        // Either side can be empty and the session is still worth keeping: a
+        // failed system-audio tap must not discard a good microphone
+        // recording, and vice versa.
+        var mixedAny = false
+
+        for url in [youTrackURL, themTrackURL] {
+            let asset = AVURLAsset(url: url)
+            guard let sourceTrack = try await asset.loadTracks(withMediaType: .audio).first else {
+                logger.warning("No audio track in \(url.lastPathComponent); excluding it from the mix")
+                continue
+            }
+            let duration = try await asset.load(.duration)
+            guard duration.isValid, duration.seconds > 0 else {
+                logger.warning("\(url.lastPathComponent) is empty; excluding it from the mix")
+                continue
+            }
+            guard let compTrack = composition.addMutableTrack(
+                withMediaType: .audio,
+                preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+
+            try compTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration),
+                                          of: sourceTrack,
+                                          at: .zero)
+            mixedAny = true
+        }
+
+        guard mixedAny else {
+            throw SessionWriterError.noAudioCaptured
+        }
+
+        guard let exportSession = AVAssetExportSession(asset: composition,
+                                                       presetName: AVAssetExportPresetAppleM4A) else {
+            throw SessionWriterError.exportUnavailable
+        }
         exportSession.outputURL = m4aURL
         exportSession.outputFileType = .m4a
-        
+
         await exportSession.export()
+
+        // Report export failures instead of leaving a missing file for a later
+        // stage to trip over.
+        if let error = exportSession.error {
+            throw error
+        }
+        guard FileManager.default.fileExists(atPath: m4aURL.path) else {
+            throw SessionWriterError.exportProducedNoFile
+        }
     }
 }

@@ -340,6 +340,7 @@ struct MeetingDetailView: View {
     // @ObservedObject does not apply. Observation is automatic; no wrapper
     // is needed since nothing here binds to $meeting.
     let meeting: Meeting
+    @EnvironmentObject var appState: AppState
     @State private var notes: String = ""
     @State private var transcript: TranscriptDocument?
     @StateObject private var playerVM = AudioPlayerViewModel()
@@ -437,15 +438,17 @@ struct MeetingDetailView: View {
                             .frame(maxWidth: .infinity)
                             .padding(40)
                     } else if meeting.state == .failed {
-                        VStack(spacing: 12) {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.title2)
-                                .foregroundColor(Color(red: 1, green: 0.4, blue: 0.4))
-                            Text("PIPELINE FAILED")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(Color(red: 1, green: 0.4, blue: 0.4))
+                        ContentUnavailableView {
+                            Label("Transcription Failed", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text("The recorded audio is still on disk. You can try transcribing it again.")
+                        } actions: {
+                            Button("Retry Transcription") {
+                                Task { await appState.sessionController.retryTranscription(for: meeting) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(appState.sessionController.isTranscribing)
                         }
-                        .frame(maxWidth: .infinity)
                         .padding(40)
                     } else {
                         Text("NO TRANSCRIPT DATA")

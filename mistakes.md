@@ -174,3 +174,34 @@ Only inspecting the actual downloaded artifact caught it:
 will be overwritten. And verify security-relevant settings on the **built,
 signed artifact**, not in the source tree: the release workflow now greps the
 signed app's entitlements and fails if `audio-input` is absent.
+
+## 2026-09-11 — First real recording failed: pids are not AudioObjectIDs
+
+**What happened.** The first real test call produced `you.caf` with 64.5s of
+microphone audio and `them.caf` with **0 frames**. Transcription then failed
+with "Resource path does not exist … session.m4a".
+
+Two independent bugs:
+
+1. `CATapDescription(stereoGlobalTapButExcludeProcesses:)` takes
+   **AudioObjectIDs**, not Unix pids. The app passed `getpid()`, so
+   `AudioHardwareCreateProcessTap` returned `kAudioHardwareBadObjectError`
+   ('!obj', 560947818) and the tap never started. Proven by probe: excluding
+   `[]` succeeds, excluding `[getpid()]` fails; pid 82074 translates to
+   AudioObjectID 149 via `kAudioHardwarePropertyTranslatePIDToProcessObject`.
+
+   Earlier I "fixed" this line by changing `Int($0)` to `AudioObjectID($0)`,
+   which made it **compile** while leaving it semantically wrong. A cast that
+   silences a type error is not a fix.
+
+2. `muxToM4A` guarded `themAsset.loadTracks(...).first` with `else { return }`.
+   An empty them.caf has no track, so the mux silently returned, never wrote
+   `session.m4a`, and `stopAndFinalize` reported success. One failed input
+   discarded a whole good recording.
+
+**How to apply.** A CoreAudio OSStatus is a FourCC — decode it
+(`560947818` → `'!obj'`) instead of treating it as an opaque number. When an
+API takes an opaque integer id, confirm what *kind* of id it wants; identical
+Swift types do not imply identical semantics. And never let one empty input
+cause a silent `return` in a pipeline that has already captured unrecoverable
+data — degrade to what succeeded and report the rest.
