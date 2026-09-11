@@ -41,8 +41,24 @@ jobs:
         timeout-minutes: 10
         run: |
           set -o pipefail
+          # Stream to a file so a hang still leaves evidence of the last test
+          # that started, then print it from a step that always runs.
           xcodebuild test \
             -scheme Atrium \
             -destination 'platform=macOS' \
-            -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -80
+            CODE_SIGNING_ALLOWED=NO > test.log 2>&1 &
+          XCB=$!
+          # Print progress while it runs so the log is never empty.
+          while kill -0 $XCB 2>/dev/null; do
+            sleep 15
+            grep -E "Test Case .* started|Test Suite .* started" test.log | tail -1 || true
+          done
+          wait $XCB
+
+      - name: Show last test that started
+        if: always()
+        run: |
+          echo "--- last 60 lines ---"
+          tail -60 test.log || true
+          echo "--- test cases seen ---"
+          grep -E "Test Case|Test Suite" test.log | tail -25 || true
