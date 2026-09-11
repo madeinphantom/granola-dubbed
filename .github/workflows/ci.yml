@@ -35,9 +35,14 @@ jobs:
             -destination 'platform=macOS' \
             CODE_SIGNING_ALLOWED=NO
 
+      # The unit tests are pure logic; hosting them in the app would launch
+      # SwiftUI and Sparkle's updater on a headless runner, which hangs.
       - name: Test
+        timeout-minutes: 10
         run: |
+          set -o pipefail
           xcodebuild test \
             -scheme Atrium \
             -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tail -80
