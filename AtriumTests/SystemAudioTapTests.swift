@@ -8,6 +8,9 @@ final class SystemAudioTapTests: XCTestCase {
     /// kAudioHardwareBadObjectError ('!obj') and system audio was never
     /// captured — every recording had an empty them.caf.
     func testPIDIsTranslatedToADifferentAudioObjectID() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == nil,
+                          "Skipped on CI: no audio hardware")
+
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -32,6 +35,9 @@ final class SystemAudioTapTests: XCTestCase {
     /// A global tap excluding no processes must be creatable; this is the
     /// baseline the app's tap builds on.
     func testGlobalTapCanBeCreated() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == nil,
+                          "Skipped on CI: no audio hardware")
+
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         description.uuid = UUID()
         description.name = "AtriumTests probe"
