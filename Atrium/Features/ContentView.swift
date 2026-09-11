@@ -109,6 +109,30 @@ struct MainAppView: View {
                     Rectangle().fill(Color(white: 0.15)).frame(height: 1)
                 }
                 
+                // System audio unavailable — actionable, since the fix is a
+                // permission toggle the user has to make in System Settings.
+                if appState.sessionController.systemAudioUnavailable {
+                    HStack(spacing: 8) {
+                        Image(systemName: "speaker.slash")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Text("System audio isn't being captured")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Open Settings") {
+                            PermissionService.openScreenRecordingSettings()
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.08))
+
+                    Rectangle().fill(Color(white: 0.15)).frame(height: 1)
+                }
+
                 // Error banner
                 if let error = appState.sessionController.lastError {
                     HStack(spacing: 8) {

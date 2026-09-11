@@ -8,12 +8,14 @@ final class SessionController: ObservableObject {
     private let logger = Logger(subsystem: "app.atrium.app", category: "SessionController")
     
     enum RecordingError: LocalizedError {
+        case screenRecordingDenied
         case microphoneDenied
         case alreadyRecording
         
         var errorDescription: String? {
             switch self {
             case .microphoneDenied: return "Microphone access is required. Grant it in System Settings > Privacy & Security > Microphone."
+            case .screenRecordingDenied: return "Recording your voice only — system audio needs Screen Recording access in System Settings > Privacy & Security."
             case .alreadyRecording: return "A recording is already in progress."
             }
         }
@@ -22,6 +24,8 @@ final class SessionController: ObservableObject {
     @Published var activeSession: DualCaptureSession?
     @Published var activeMeeting: Meeting?
     @Published var isRecording: Bool = false
+    /// True when recording proceeded without system-audio capture.
+    @Published var systemAudioUnavailable = false
     @Published var isTranscribing: Bool = false
     @Published var transcriptionProgress: Float = 0.0
     @Published var lastError: String?
@@ -68,6 +72,19 @@ final class SessionController: ObservableObject {
         guard micStatus == .granted else {
             lastError = RecordingError.microphoneDenied.localizedDescription
             return
+        }
+
+        // System-audio capture is gated by screen-recording consent. Without
+        // it the tap still runs but every sample is silent, which previously
+        // produced recordings containing only the microphone with no warning.
+        if !PermissionService.hasScreenCapturePermission() {
+            PermissionService.requestScreenCapturePermission()
+            if !PermissionService.hasScreenCapturePermission() {
+                systemAudioUnavailable = true
+                lastError = RecordingError.screenRecordingDenied.localizedDescription
+            }
+        } else {
+            systemAudioUnavailable = false
         }
         
         do {

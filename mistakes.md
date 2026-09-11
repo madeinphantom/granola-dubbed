@@ -205,3 +205,25 @@ API takes an opaque integer id, confirm what *kind* of id it wants; identical
 Swift types do not imply identical semantics. And never let one empty input
 cause a silent `return` in a pipeline that has already captured unrecoverable
 data — degrade to what succeeded and report the rest.
+
+## 2026-09-11 — Audio taps are gated by Screen Recording consent, and fail SILENTLY
+
+**What happened.** After fixing the pid→AudioObjectID bug, the tap started
+successfully and delivered 275 callbacks / 140800 frames — but **every sample
+was zero**. The aggregate device was configured correctly (1 input buffer, 2
+channels) and the tap format matched exactly what the app assumed (48kHz stereo
+interleaved Float32). Nothing reported an error.
+
+The cause: CoreAudio process taps require the same TCC consent as screen
+capture. Without it macOS does not fail the tap — it delivers **silent
+buffers**. `CGPreflightScreenCaptureAccess()` returned false.
+
+Worse, `PermissionService.checkScreenCapture()` already existed but was **never
+called**. `startRecording` only checked the microphone, so the app cheerfully
+recorded meetings with system audio silently zeroed.
+
+**How to apply.** When a capture API "works" but produces zeroes, suspect
+permission before suspecting format or configuration — TCC-gated media APIs
+routinely degrade to silence/black frames rather than erroring. And an
+unreferenced permission check is not a permission check: grep for call sites,
+not just definitions.
