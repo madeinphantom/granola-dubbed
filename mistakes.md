@@ -256,3 +256,23 @@ read the format *after* every configuration call, never before. And when two
 parallel tracks of the same recording disagree in duration, measure each
 capture path independently — the shorter one is not necessarily the broken one,
 but the ratio points straight at a channel-count or sample-rate assumption.
+
+## 2026-09-14 — Hosted unit tests launched the whole app, hanging headless CI
+
+**What happened.** CI's Build step passed but Test hung indefinitely (11+
+minutes, repeatedly). I first blamed the two new hardware tests and skipped
+them; it still hung. The actual cause was structural: `AtriumTests` depends on
+the `Atrium` app target, so running tests **launches the app**, which starts
+Sparkle's updater (`startingUpdater: true`, spawning XPC services and a network
+check), sets an activation policy, and runs session recovery. None of that
+completes on a headless runner.
+
+**How to apply.** Guessing which test hangs wastes runs. Ask instead what the
+test *host* does at launch — hosted macOS unit tests execute the full app
+lifecycle before a single test runs. Anything the app starts automatically
+(updaters, XPC, network schedulers, window setup) must be suppressed under
+XCTest. Detect with `NSClassFromString("XCTestCase") != nil` or the
+`XCTestConfigurationFilePath` environment variable.
+
+Also: always bound a CI step with `timeout-minutes`. An unbounded hang costs a
+runner and gives no diagnostic, whereas a timeout at least fails fast.

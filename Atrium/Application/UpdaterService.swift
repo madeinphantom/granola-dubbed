@@ -23,8 +23,18 @@ final class UpdaterService: ObservableObject {
         set { controller.updater.automaticallyChecksForUpdates = newValue }
     }
 
+    /// True when running inside the XCTest host rather than the real app.
+    private static var isRunningTests: Bool {
+        NSClassFromString("XCTestCase") != nil
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     private init() {
-        controller = SPUStandardUpdaterController(startingUpdater: true,
+        // Starting the updater spawns Sparkle's XPC services and schedules a
+        // network check. Under XCTest on a headless runner that never
+        // completes, so the test process hangs instead of failing.
+        let shouldStart = !Self.isRunningTests
+        controller = SPUStandardUpdaterController(startingUpdater: shouldStart,
                                                   updaterDelegate: nil,
                                                   userDriverDelegate: nil)
         controller.updater.publisher(for: \.canCheckForUpdates)

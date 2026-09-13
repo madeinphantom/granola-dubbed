@@ -272,6 +272,7 @@ struct MainAppView: View {
             }
         })
         .onAppear {
+            guard !AtriumApp.isRunningTests else { return }
             appState.sessionController.recoverIncompleteSessions()
         }
     }

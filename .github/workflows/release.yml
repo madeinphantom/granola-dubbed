@@ -30,11 +30,10 @@ jobs:
       - name: Generate project
         run: xcodegen generate
 
-      # Tests are advisory here: several exercise real audio hardware, which a
-      # headless runner lacks, and a hang must not block shipping a binary.
       - name: Test
-        timeout-minutes: 8
-        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          CI: "true"
         run: |
           xcodebuild test \
             -scheme Atrium \

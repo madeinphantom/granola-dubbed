@@ -59,6 +59,14 @@ struct AtriumApp: App {
     /// `LSUIElement` is fixed at build time, so honour the menu-bar-only
     /// preference at runtime instead.
     private func applyActivationPolicy() {
+        guard !Self.isRunningTests else { return }
         NSApp.setActivationPolicy(prefs.menuBarOnly ? .accessory : .regular)
+    }
+
+    /// The unit tests are hosted in this app, so launching it must not start
+    /// background work that never finishes on a headless machine.
+    static var isRunningTests: Bool {
+        NSClassFromString("XCTestCase") != nil
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 }
