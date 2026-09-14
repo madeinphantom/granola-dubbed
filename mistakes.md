@@ -276,3 +276,23 @@ XCTest. Detect with `NSClassFromString("XCTestCase") != nil` or the
 
 Also: always bound a CI step with `timeout-minutes`. An unbounded hang costs a
 runner and gives no diagnostic, whereas a timeout at least fails fast.
+
+## 2026-09-14 — `xcodebuild` does not forward the shell environment to tests
+
+**What happened.** After fixing the app-launch hang, CI still timed out. The log
+named the culprit exactly: `MicCaptureFormatTests` started, then CoreAudio spun
+for 8 minutes — `HALC_ShellObject::HasProperty: call to the proxy failed`,
+then `throwing -10877`. The `XCTSkipUnless(environment["CI"] == nil)` guard
+never fired, because `xcodebuild` does not pass the shell environment into the
+test process.
+
+**How to apply.** Gate hardware-dependent tests on the hardware itself, not on
+an environment variable. Query CoreAudio for a default device with channels
+(`kAudioHardwarePropertyDefaultInputDevice` +
+`kAudioDevicePropertyStreamConfiguration`). It is true on a developer machine
+and false on a headless runner, with no CI-specific configuration to keep in
+sync.
+
+Also: read the failing log before theorising. The first hang I blamed on these
+tests and was wrong (it was the app host); the second genuinely was them, and
+the log said so in both cases.

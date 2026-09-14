@@ -3,13 +3,29 @@ import CoreAudio
 @testable import Atrium
 
 final class SystemAudioTapTests: XCTestCase {
+    /// `xcodebuild` does not forward the shell environment into the test
+    /// process, so ask CoreAudio whether real hardware exists instead of
+    /// relying on a CI env var.
+    private static var hasRealAudioOutputDevice: Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                                &address, 0, nil, &size, &deviceID)
+        return status == noErr && deviceID != AudioDeviceID(kAudioObjectUnknown)
+    }
+
     /// Regression: the app passed raw Unix pids to `CATapDescription`, which
     /// takes AudioObjectIDs. `AudioHardwareCreateProcessTap` then failed with
     /// kAudioHardwareBadObjectError ('!obj') and system audio was never
     /// captured — every recording had an empty them.caf.
     func testPIDIsTranslatedToADifferentAudioObjectID() throws {
-        try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == nil,
-                          "Skipped on CI: no audio hardware")
+        try XCTSkipUnless(Self.hasRealAudioOutputDevice,
+                          "No audio output device on this host")
 
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
@@ -35,8 +51,8 @@ final class SystemAudioTapTests: XCTestCase {
     /// A global tap excluding no processes must be creatable; this is the
     /// baseline the app's tap builds on.
     func testGlobalTapCanBeCreated() throws {
-        try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == nil,
-                          "Skipped on CI: no audio hardware")
+        try XCTSkipUnless(Self.hasRealAudioOutputDevice,
+                          "No audio output device on this host")
 
         let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         description.uuid = UUID()
