@@ -286,12 +286,16 @@ then `throwing -10877`. The `XCTSkipUnless(environment["CI"] == nil)` guard
 never fired, because `xcodebuild` does not pass the shell environment into the
 test process.
 
-**How to apply.** Gate hardware-dependent tests on the hardware itself, not on
-an environment variable. Query CoreAudio for a default device with channels
-(`kAudioHardwarePropertyDefaultInputDevice` +
-`kAudioDevicePropertyStreamConfiguration`). It is true on a developer machine
-and false on a headless runner, with no CI-specific configuration to keep in
-sync.
+**Then that failed too.** Querying CoreAudio for a default input device returns
+**true** on GitHub's macOS runners — they expose a virtual device — so the skip
+never fired and `setVoiceProcessingEnabled` still hung in the HAL.
+
+**How to apply.** There is no reliable probe that distinguishes real audio
+hardware from a runner's virtual device. A test that must drive the audio HAL
+does not belong in CI at all. Delete it and pin the part that is actually ours:
+the downmix arithmetic that made the bug destructive. Behaviour of the OS is
+Apple's to test; behaviour of our code is ours. Three CI runs were spent
+learning this.
 
 Also: read the failing log before theorising. The first hang I blamed on these
 tests and was wrong (it was the app host); the second genuinely was them, and
