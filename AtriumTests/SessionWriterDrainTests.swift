@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import Atrium
 
 /// Covers the ring-buffer contract the writer's drain loop depends on.
@@ -41,5 +42,21 @@ final class SessionWriterDrainTests: XCTestCase {
         XCTAssertEqual(buffer.availableFrames, 30)
         _ = buffer.read(count: 10)
         XCTAssertEqual(buffer.availableFrames, 20)
+    }
+
+    func testStopFlushesAndExportsBufferedMicAudio() async throws {
+        let tap = AudioRingBuffer(capacityFrames: 48_000, channels: 2)
+        let mic = AudioRingBuffer(capacityFrames: 48_000, channels: 1)
+        let writer = try SessionWriter(sessionID: UUID(), tapBuffer: tap, micBuffer: mic)
+        defer { try? FileManager.default.removeItem(at: writer.sessionURL) }
+
+        writer.startPolling()
+        mic.write(data: [Float](repeating: 0.1, count: 4_801), count: 4_801)
+        try await writer.stopAndFinalize()
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: writer.m4aURL.path))
+        let duration = try await AVURLAsset(url: writer.m4aURL).load(.duration)
+        XCTAssertGreaterThan(duration.seconds, 0.09)
+        XCTAssertLessThan(duration.seconds, 0.2)
     }
 }
