@@ -19,67 +19,85 @@ final class DualCaptureSession {
     let sessionID = UUID()
     
     private var sckFallback: SCKFallbackCapture?
-    private var usingSCKFallback = false
     
-    func start() throws {
+    /// Starts microphone capture and the best available system-audio source.
+    /// The returned value is false when system audio is unavailable; that is
+    /// recoverable because the microphone recording remains useful.
+    func start(captureSystemAudio: Bool) async throws -> Bool {
         clockAligner.reset()
         writer = try SessionWriter(sessionID: sessionID, tapBuffer: tapRingBuffer, micBuffer: micRingBuffer)
-        
+
+        var systemAudioStarted = false
         // Try CoreAudio tap first (preferred — pre-volume, lower latency)
-        tapCapture = SystemAudioTap()
-        do {
+        if captureSystemAudio {
+          tapCapture = SystemAudioTap()
+          do {
             try tapCapture?.start { [weak self] bufferList, _, timeStamp in
                 self?.handleSystemAudio(bufferList: bufferList, timeStamp: timeStamp)
             }
             logger.info("Using CoreAudio tap for system audio")
+            systemAudioStarted = true
         } catch {
             logger.warning("CoreAudio tap failed: \(error.localizedDescription). Falling back to SCK.")
+            tapCapture?.stop()
             tapCapture = nil
-            
-            // Fallback: ScreenCaptureKit captures both system audio and mic
-            sckFallback = SCKFallbackCapture()
-            sckFallback?.onSystemAudio = { [weak self] sampleBuffer in
+
+            // Await fallback startup before returning. A detached startup
+            // raced the mic and allowed a session to appear active before SCK
+            // had either started or failed.
+            let fallback = SCKFallbackCapture()
+            fallback.onSystemAudio = { [weak self] sampleBuffer in
                 self?.handleSCKSystemAudio(sampleBuffer: sampleBuffer)
             }
-            sckFallback?.onMicAudio = { [weak self] sampleBuffer in
-                self?.handleSCKMicAudio(sampleBuffer: sampleBuffer)
+            do {
+                try await fallback.start()
+                sckFallback = fallback
+                systemAudioStarted = true
+                logger.info("Using SCK fallback for system audio")
+            } catch {
+                logger.error("SCK fallback also failed; continuing with microphone only: \(error.localizedDescription)")
             }
-            
-            Task {
-                do {
-                    try await sckFallback?.start()
-                    usingSCKFallback = true
-                    logger.info("Using SCK fallback for capture")
-                } catch {
-                    logger.error("SCK fallback also failed: \(error.localizedDescription)")
-                }
-            }
+          }
         }
-        
-        // Only start mic capture if NOT using SCK (which already captures mic)
-        if !usingSCKFallback {
-            micCapture = MicCapture()
-            try micCapture?.start { [weak self] buffer, time in
+
+        // MicCapture is the sole microphone source, including in SCK fallback
+        // mode. This keeps one format/downmix path and prevents duplicate mic.
+        let mic = MicCapture()
+        do {
+            try mic.start { [weak self] buffer, time in
                 self?.handleMicAudio(buffer: buffer, time: time)
             }
-        }
-        
-        writer?.startPolling()
-    }
-    
-    func stop() async {
-        tapCapture?.stop()
-        micCapture?.stop()
-        
-        if usingSCKFallback {
-            try? await sckFallback?.stop()
-        }
-        
-        do {
-            try await writer?.stopAndFinalize()
+            micCapture = mic
         } catch {
-            logger.error("Failed to finalize session: \(error.localizedDescription)")
+            tapCapture?.stop()
+            tapCapture = nil
+            try? await sckFallback?.stop()
+            sckFallback = nil
+            writer?.discardUnstartedSession()
+            writer = nil
+            throw error
         }
+
+        writer?.startPolling()
+        return systemAudioStarted
+    }
+
+    func stop() async throws {
+        tapCapture?.stop()
+        tapCapture = nil
+        micCapture?.stop()
+
+        if let fallback = sckFallback {
+            do {
+                try await fallback.stop()
+            } catch {
+                logger.error("Could not stop SCK capture cleanly: \(error.localizedDescription)")
+            }
+        }
+        sckFallback = nil
+
+        try await writer?.stopAndFinalize()
+        writer = nil
     }
     
     private func handleSystemAudio(bufferList: UnsafePointer<AudioBufferList>, timeStamp: AudioTimeStamp) {
@@ -149,10 +167,6 @@ final class DualCaptureSession {
     // SCK fallback handlers — extract float samples from CMSampleBuffer
     private func handleSCKSystemAudio(sampleBuffer: CMSampleBuffer) {
         extractAndWrite(sampleBuffer: sampleBuffer, to: tapRingBuffer)
-    }
-    
-    private func handleSCKMicAudio(sampleBuffer: CMSampleBuffer) {
-        extractAndWrite(sampleBuffer: sampleBuffer, to: micRingBuffer)
     }
     
     private func extractAndWrite(sampleBuffer: CMSampleBuffer, to ringBuffer: AudioRingBuffer) {

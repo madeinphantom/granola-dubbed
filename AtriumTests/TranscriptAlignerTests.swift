@@ -52,4 +52,16 @@ final class TranscriptAlignerTests: XCTestCase {
     func testEmptyWordListProducesNoSegments() {
         XCTAssertTrue(TranscriptAligner().align(words: [], speakerTurns: turns).isEmpty)
     }
+
+    func testSegmentTextSurvivesMissingWordTimestamps() {
+        let raw = TranscriptSegment(id: UUID(), speakerId: UUID(), start: 2, end: 4,
+                                    text: "This was said", words: [], isOverlap: false)
+        let units = TranscriptAligner.timedUnits(from: [raw])
+        let aligned = TranscriptAligner().align(words: units, speakerTurns: [],
+                                                fallbackSpeakerId: speakerA)
+        XCTAssertEqual(aligned.count, 1)
+        XCTAssertEqual(aligned[0].text, "This was said")
+        XCTAssertEqual(aligned[0].start, 2)
+        XCTAssertEqual(aligned[0].end, 4)
+    }
 }

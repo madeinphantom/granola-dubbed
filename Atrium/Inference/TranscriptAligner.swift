@@ -1,6 +1,17 @@
 import Foundation
 
 final class TranscriptAligner {
+    /// Keep segment text when the recognizer omits word timestamps.
+    /// This degrades timing precision but preserves the transcript.
+    static func timedUnits(from segments: [TranscriptSegment]) -> [TranscriptWord] {
+        segments.flatMap { segment in
+            if !segment.words.isEmpty { return segment.words }
+            guard !segment.text.isEmpty else { return [] }
+            return [TranscriptWord(start: segment.start, end: segment.end,
+                                   text: segment.text, probability: 1)]
+        }
+    }
+
     /// Assigns each word to the speaker turn it overlaps most.
     ///
     /// Words that overlap no turn are attributed to `fallbackSpeakerId` (or the

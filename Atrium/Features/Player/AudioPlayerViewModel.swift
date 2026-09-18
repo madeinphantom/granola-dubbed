@@ -5,22 +5,33 @@ final class AudioPlayerViewModel: ObservableObject {
     @Published var isPlaying = false
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
+    @Published private(set) var errorMessage: String?
     
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
+    private var failureObserver: NSObjectProtocol?
     
     func load(url: URL) {
         // Clean up previous player
         cleanup()
+
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            errorMessage = "Audio is still being prepared."
+            return
+        }
         
         let item = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: item)
         
         Task {
-            if let d = try? await AVAsset(url: url).load(.duration) {
+            if let d = try? await AVAsset(url: url).load(.duration), d.isValid, d.seconds > 0 {
                 await MainActor.run {
-                    self.duration = d.seconds.isFinite ? d.seconds : 0
+                    self.duration = d.seconds
+                }
+            } else {
+                await MainActor.run {
+                    self.errorMessage = "This recording has no playable audio."
                 }
             }
         }
@@ -45,16 +56,27 @@ final class AudioPlayerViewModel: ObservableObject {
             self?.currentTime = 0
             self?.player?.seek(to: .zero)
         }
+
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] notification in
+            self?.isPlaying = false
+            self?.errorMessage = (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?.localizedDescription
+                ?? "This recording could not be played."
+        }
     }
     
     func togglePlayback() {
-        guard let p = player else { return }
+        guard let p = player, duration > 0, errorMessage == nil else { return }
         if isPlaying {
             p.pause()
+            isPlaying = false
         } else {
             p.play()
+            isPlaying = true
         }
-        isPlaying.toggle()
     }
     
     func seek(to time: TimeInterval) {
@@ -72,14 +94,20 @@ final class AudioPlayerViewModel: ObservableObject {
             NotificationCenter.default.removeObserver(eo)
             endObserver = nil
         }
+        if let fo = failureObserver {
+            NotificationCenter.default.removeObserver(fo)
+            failureObserver = nil
+        }
         player = nil
         isPlaying = false
         currentTime = 0
         duration = 0
+        errorMessage = nil
     }
     
     deinit {
         if let to = timeObserver { player?.removeTimeObserver(to) }
         if let eo = endObserver { NotificationCenter.default.removeObserver(eo) }
+        if let fo = failureObserver { NotificationCenter.default.removeObserver(fo) }
     }
 }

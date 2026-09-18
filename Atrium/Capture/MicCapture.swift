@@ -2,6 +2,7 @@ import AVFoundation
 
 final class MicCapture {
     let engine = AVAudioEngine()
+    private var tapInstalled = false
 
     func start(handler: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) throws {
         let input = engine.inputNode
@@ -27,7 +28,14 @@ final class MicCapture {
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { buf, time in
             handler(buf, time)
         }
-        try engine.start()
+        tapInstalled = true
+        do {
+            try engine.start()
+        } catch {
+            input.removeTap(onBus: 0)
+            tapInstalled = false
+            throw error
+        }
     }
 
     /// The format the tap actually delivers, valid once `start` has run.
@@ -36,7 +44,10 @@ final class MicCapture {
     }
 
     func stop() {
-        engine.inputNode.removeTap(onBus: 0)
+        if tapInstalled {
+            engine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
         engine.stop()
     }
 

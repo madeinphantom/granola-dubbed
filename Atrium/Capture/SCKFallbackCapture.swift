@@ -7,18 +7,20 @@ enum SCKCaptureError: Error {
 
 final class SCKFallbackCapture: NSObject, SCStreamOutput {
     private var stream: SCStream?
-    
+
     var onSystemAudio: ((CMSampleBuffer) -> Void)?
-    var onMicAudio: ((CMSampleBuffer) -> Void)?
 
     func start() async throws {
+        guard stream == nil else { return }
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first else { throw SCKCaptureError.noDisplay }
         let filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
 
         let config = SCStreamConfiguration()
         config.capturesAudio = true
-        config.captureMicrophone = true
+        // MicCapture owns the microphone path. Capturing it here as well
+        // creates duplicate/competing mic tracks when CoreAudio falls back.
+        config.captureMicrophone = false
         config.excludesCurrentProcessAudio = true
         config.sampleRate = 48000
         config.channelCount = 2
@@ -28,14 +30,13 @@ final class SCKFallbackCapture: NSObject, SCStreamOutput {
         config.queueDepth = 3
         
         let newStream = SCStream(filter: filter, configuration: config, delegate: nil)
-        self.stream = newStream
         
         let queue = DispatchQueue(label: "app.atrium.sck")
         try newStream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
-        try newStream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue)
         try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
 
         try await newStream.startCapture()
+        self.stream = newStream
     }
     
     func stop() async throws {
@@ -48,7 +49,9 @@ final class SCKFallbackCapture: NSObject, SCStreamOutput {
         case .audio:
             onSystemAudio?(sampleBuffer)
         case .microphone:
-            onMicAudio?(sampleBuffer)
+            // Disabled in configuration; keep the handler defensive if the
+            // framework emits a microphone buffer during reconfiguration.
+            break
         case .screen:
             // Discard
             break

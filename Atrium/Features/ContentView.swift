@@ -253,6 +253,7 @@ struct MainAppView: View {
             if let id = selectedMeetingID,
                let meeting = meetings.first(where: { $0.id == id }) {
                 MeetingDetailView(meeting: meeting)
+                    .id(meeting.id)
             } else {
                 ContentUnavailableView(
                     "No Recording Selected",
@@ -274,6 +275,10 @@ struct MainAppView: View {
         .onAppear {
             guard !AtriumApp.isRunningTests else { return }
             appState.sessionController.recoverIncompleteSessions()
+            if selectedMeetingID == nil { selectedMeetingID = meetings.first?.id }
+        }
+        .onChange(of: appState.sessionController.activeMeeting?.id) { _, newID in
+            if let newID { selectedMeetingID = newID }
         }
     }
 }
@@ -493,54 +498,70 @@ struct MeetingDetailView: View {
                     .overlay(
                         VStack(spacing: 32) {
                             Spacer()
-                            
-                            // Waveform bars (seeded from meeting ID for consistency)
-                            WaveformBars(
-                                progress: playerVM.duration > 0 ? playerVM.currentTime / playerVM.duration : 0,
-                                isPlaying: playerVM.isPlaying,
-                                seed: meeting.id
-                            )
-                            
-                            VStack(spacing: 8) {
-                                Slider(value: Binding(
-                                    get: { playerVM.currentTime },
-                                    set: { playerVM.seek(to: $0) }
-                                ), in: 0...max(0.01, playerVM.duration))
-                                .tint(.white)
-                                
-                                HStack {
-                                    Text(formatTime(playerVM.currentTime))
-                                    Spacer()
-                                    Text(formatTime(playerVM.duration))
+
+                            if let errorMessage = playerVM.errorMessage {
+                                ContentUnavailableView("Audio Unavailable", systemImage: "waveform.slash", description: Text(errorMessage))
+                            } else if playerVM.duration == 0 {
+                                VStack(spacing: 10) {
+                                    if meeting.state == .processing {
+                                        ProgressView().tint(.white)
+                                        Text("PREPARING AUDIO")
+                                    } else {
+                                        Image(systemName: "waveform.slash")
+                                        Text("NO AUDIO FILE")
+                                    }
                                 }
-                                .font(.system(.caption2, design: .monospaced))
+                                .font(.system(.caption, design: .monospaced))
                                 .foregroundColor(Color(white: 0.4))
-                            }
-                            
-                            HStack(spacing: 24) {
-                                Button(action: { playerVM.seek(to: max(0, playerVM.currentTime - 15)) }) {
-                                    Image(systemName: "gobackward.15")
-                                        .font(.title3)
-                                        .foregroundStyle(.secondary)
+                            } else {
+                                // Waveform bars (seeded from meeting ID for consistency)
+                                WaveformBars(
+                                    progress: playerVM.currentTime / playerVM.duration,
+                                    isPlaying: playerVM.isPlaying,
+                                    seed: meeting.id
+                                )
+
+                                VStack(spacing: 8) {
+                                    Slider(value: Binding(
+                                        get: { playerVM.currentTime },
+                                        set: { playerVM.seek(to: $0) }
+                                    ), in: 0...playerVM.duration)
+                                    .tint(.white)
+
+                                    HStack {
+                                        Text(formatTime(playerVM.currentTime))
+                                        Spacer()
+                                        Text(formatTime(playerVM.duration))
+                                    }
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(Color(white: 0.4))
                                 }
-                                .buttonStyle(.plain)
-                                
-                                Button(action: { playerVM.togglePlayback() }) {
-                                    Image(systemName: playerVM.isPlaying ? "pause.fill" : "play.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(.black)
-                                        .frame(width: 52, height: 52)
-                                        .background(.white, in: Circle())
+
+                                HStack(spacing: 24) {
+                                    Button(action: { playerVM.seek(to: max(0, playerVM.currentTime - 15)) }) {
+                                        Image(systemName: "gobackward.15")
+                                            .font(.title3)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button(action: { playerVM.togglePlayback() }) {
+                                        Image(systemName: playerVM.isPlaying ? "pause.fill" : "play.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(.black)
+                                            .frame(width: 52, height: 52)
+                                            .background(.white, in: Circle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .keyboardShortcut(.space, modifiers: [])
+
+                                    Button(action: { playerVM.seek(to: min(playerVM.duration, playerVM.currentTime + 30)) }) {
+                                        Image(systemName: "goforward.30")
+                                            .font(.title3)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
-                                .keyboardShortcut(.space, modifiers: [])
-                                
-                                Button(action: { playerVM.seek(to: min(playerVM.duration, playerVM.currentTime + 30)) }) {
-                                    Image(systemName: "goforward.30")
-                                        .font(.title3)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
                             }
                             
                             Spacer()
@@ -554,7 +575,11 @@ struct MeetingDetailView: View {
         .background(Color.black)
         .onAppear { loadData() }
         .onChange(of: meeting.stateRaw) { _, _ in
-            // Auto-refresh transcript when state changes (e.g. processing -> ready)
+            // The audio file and transcript are both created after recording
+            // stops. Refresh both when processing transitions to ready/failed.
+            loadData()
+        }
+        .onChange(of: meeting.transcriptJSONPath) { _, _ in
             transcript = AudioStore.shared.loadTranscript(for: meeting)
         }
     }

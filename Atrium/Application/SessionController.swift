@@ -3,6 +3,14 @@ import SwiftData
 import Combine
 import OSLog
 
+private enum TranscriptionPipelineError: LocalizedError {
+    case noSpeechDetected
+
+    var errorDescription: String? {
+        "No speech was detected in the recording. Check that the audio tracks contain speech before retrying."
+    }
+}
+
 @MainActor
 final class SessionController: ObservableObject {
     private let logger = Logger(subsystem: "app.atrium.app", category: "SessionController")
@@ -23,7 +31,9 @@ final class SessionController: ObservableObject {
     
     @Published var activeSession: DualCaptureSession?
     @Published var activeMeeting: Meeting?
+    @Published var isStarting: Bool = false
     @Published var isRecording: Bool = false
+    @Published var isFinalizing: Bool = false
     /// True when recording proceeded without system-audio capture.
     @Published var systemAudioUnavailable = false
     @Published var isTranscribing: Bool = false
@@ -37,6 +47,15 @@ final class SessionController: ObservableObject {
     
     // Check for incomplete sessions on launch and mark them as failed
     func recoverIncompleteSessions() {
+        // A crash or failed export can leave a SwiftData row in an in-flight
+        // state even if the marker was already removed. Keep it retryable.
+        if let meetings = try? audioStore.container.mainContext.fetch(FetchDescriptor<Meeting>()) {
+            for meeting in meetings where (meeting.state == .recording || meeting.state == .processing)
+                && meeting.id != activeMeeting?.id {
+                meeting.state = .failed
+            }
+            try? audioStore.container.mainContext.save()
+        }
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let sessionsDir = appSupport.appendingPathComponent("Atrium/Sessions")
         
@@ -62,10 +81,12 @@ final class SessionController: ObservableObject {
     }
     
     func startRecording() async {
-        guard activeSession == nil else {
+        guard activeSession == nil && !isStarting && !isFinalizing else {
             lastError = RecordingError.alreadyRecording.localizedDescription
             return
         }
+        isStarting = true
+        defer { isStarting = false }
         
         // Check permissions first
         let micStatus = await PermissionService.checkMicrophone()
@@ -77,9 +98,11 @@ final class SessionController: ObservableObject {
         // System-audio capture is gated by screen-recording consent. Without
         // it the tap still runs but every sample is silent, which previously
         // produced recordings containing only the microphone with no warning.
-        if !PermissionService.hasScreenCapturePermission() {
+        var canCaptureSystemAudio = PermissionService.hasScreenCapturePermission()
+        if !canCaptureSystemAudio {
             PermissionService.requestScreenCapturePermission()
-            if !PermissionService.hasScreenCapturePermission() {
+            canCaptureSystemAudio = PermissionService.hasScreenCapturePermission()
+            if !canCaptureSystemAudio {
                 systemAudioUnavailable = true
                 lastError = RecordingError.screenRecordingDenied.localizedDescription
             }
@@ -89,7 +112,7 @@ final class SessionController: ObservableObject {
         
         do {
             let session = DualCaptureSession()
-            try session.start()
+            let capturedSystemAudio = try await session.start(captureSystemAudio: canCaptureSystemAudio)
             
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
@@ -112,6 +135,7 @@ final class SessionController: ObservableObject {
             self.activeSession = session
             self.activeMeeting = meeting
             self.isRecording = true
+            self.systemAudioUnavailable = !capturedSystemAudio
             self.lastError = nil
             
             RecPillWindowManager.shared.show()
@@ -123,18 +147,30 @@ final class SessionController: ObservableObject {
     }
     
     func stopRecording() {
-        guard let session = activeSession, let meeting = activeMeeting else { return }
+        guard !isFinalizing, let session = activeSession, let meeting = activeMeeting else { return }
         
         RecPillWindowManager.shared.hide()
         self.isRecording = false
+        self.isFinalizing = true
         
         Task {
-            await session.stop()
-            meeting.state = .processing
             meeting.duration = Date().timeIntervalSince(meeting.createdAt)
+            do {
+                try await session.stop()
+            } catch {
+                meeting.state = .failed
+                lastError = "Recording could not be saved: \(error.localizedDescription)"
+                logger.error("Failed to finalize recording: \(error.localizedDescription)")
+                activeSession = nil
+                activeMeeting = nil
+                isFinalizing = false
+                try? audioStore.container.mainContext.save()
+                return
+            }
+            meeting.state = .processing
             try? audioStore.container.mainContext.save()
-            
-            self.activeSession = nil
+            activeSession = nil
+            isFinalizing = false
             await runTranscriptionPipeline(for: meeting, sessionID: session.sessionID)
         }
     }
@@ -161,6 +197,9 @@ final class SessionController: ObservableObject {
             let transcriptPath = sessionDir.appendingPathComponent("transcript.json")
             
             do {
+                if !FileManager.default.fileExists(atPath: m4aPath.path) {
+                    try await SessionWriter.rebuildMix(sessionID: sessionID)
+                }
                 logger.info("Starting offline ASR pipeline")
                 asrEngine.modelOverride = Preferences.shared.whisperModel.rawValue
                 let rawSegments = try await asrEngine.transcribe(audioURL: m4aPath) { progress in
@@ -183,7 +222,11 @@ final class SessionController: ObservableObject {
                     return (start: turn.start, end: turn.end, speakerId: id)
                 }
                 
-                let allWords = rawSegments.flatMap { $0.words }
+                // Some WhisperKit results have segment text but no word
+                // timings. Preserve that text with segment-level timing so a
+                // successful transcription cannot render as an empty page.
+                let allWords = TranscriptAligner.timedUnits(from: rawSegments)
+                guard !allWords.isEmpty else { throw TranscriptionPipelineError.noSpeechDetected }
                 let alignedSegments = transcriptAligner.align(words: allWords,
                                                              speakerTurns: typedTurns,
                                                              fallbackSpeakerId: themSpeakerID)

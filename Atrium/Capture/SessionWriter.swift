@@ -8,6 +8,7 @@ enum SessionWriterError: LocalizedError {
     case noAudioCaptured
     case exportUnavailable
     case exportProducedNoFile
+    case invalidAudioBuffer
 
     var errorDescription: String? {
         switch self {
@@ -21,6 +22,8 @@ enum SessionWriterError: LocalizedError {
             return "Could not create the audio export session."
         case .exportProducedNoFile:
             return "Audio export finished but produced no file."
+        case .invalidAudioBuffer:
+            return "Could not prepare captured audio for saving."
         }
     }
 }
@@ -40,7 +43,7 @@ final class SessionWriter {
     private let tapBuffer: AudioRingBuffer
     private let micBuffer: AudioRingBuffer
     
-    private var pollingTask: Task<Void, Never>?
+    private var pollingTask: Task<Void, Error>?
     
     init(sessionID: UUID, tapBuffer: AudioRingBuffer, micBuffer: AudioRingBuffer) throws {
         self.tapBuffer = tapBuffer
@@ -72,13 +75,22 @@ final class SessionWriter {
     func startPolling() {
         pollingTask = Task {
             while !Task.isCancelled {
-                drainAvailable()
+                try drainAvailable(includePartial: false)
                 try? await Task.sleep(nanoseconds: 50_000_000)
             }
             // Final drain: Task.sleep guarantees only a minimum delay, so a
             // backlog may remain when polling is cancelled.
-            drainAvailable()
+            try drainAvailable(includePartial: true)
         }
+    }
+
+    /// Startup failed before a meeting row was saved; these empty files are
+    /// not a recording and must not appear as an incomplete user session.
+    func discardUnstartedSession() {
+        pollingTask?.cancel()
+        youFile = nil
+        themFile = nil
+        try? FileManager.default.removeItem(at: sessionURL)
     }
     
     /// Drains everything currently buffered, not a single fixed-size chunk.
@@ -87,24 +99,38 @@ final class SessionWriter {
     /// late and more than one 50ms chunk accumulates. Reading a fixed 2400
     /// frames per tick could never catch up, so the backlog grew until the
     /// ring buffer overflowed and silently discarded recorded audio.
-    private func drainAvailable() {
+    private func drainAvailable(includePartial: Bool) throws {
         // 50ms chunks (48000 * 0.05 = 2400 frames), drained until exhausted.
         let chunkFrames = 2400
 
         while micBuffer.availableFrames >= chunkFrames,
               let micData = micBuffer.read(count: chunkFrames) {
-            writeToAudioFile(file: youFile, data: micData, channels: 1)
+            try writeToAudioFile(file: youFile, data: micData, channels: 1)
         }
         while tapBuffer.availableFrames >= chunkFrames * 2,
               let tapData = tapBuffer.read(count: chunkFrames * 2) {
-            writeToAudioFile(file: themFile, data: tapData, channels: 2)
+            try writeToAudioFile(file: themFile, data: tapData, channels: 2)
+        }
+        if includePartial {
+            let micRemaining = micBuffer.availableFrames
+            if micRemaining > 0, let micData = micBuffer.read(count: micRemaining) {
+                try writeToAudioFile(file: youFile, data: micData, channels: 1)
+            }
+            let tapRemaining = tapBuffer.availableFrames / 2 * 2
+            if tapRemaining > 0, let tapData = tapBuffer.read(count: tapRemaining) {
+                try writeToAudioFile(file: themFile, data: tapData, channels: 2)
+            }
         }
     }
 
-    private func writeToAudioFile(file: AVAudioFile?, data: [Float], channels: AVAudioChannelCount) {
-        guard let file = file, let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: channels) else { return }
+    private func writeToAudioFile(file: AVAudioFile?, data: [Float], channels: AVAudioChannelCount) throws {
+        guard let file = file, let format = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: channels) else {
+            throw SessionWriterError.invalidAudioBuffer
+        }
         let frameCount = AVAudioFrameCount(data.count / Int(channels))
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+            throw SessionWriterError.invalidAudioBuffer
+        }
         
         buffer.frameLength = frameCount
         for ch in 0..<Int(channels) {
@@ -113,7 +139,7 @@ final class SessionWriter {
                 channelData[frame] = data[frame * Int(channels) + ch]
             }
         }
-        try? file.write(from: buffer)
+        try file.write(from: buffer)
     }
     
     /// Frames lost to ring-buffer overflow during the session. Non-zero means
@@ -122,6 +148,10 @@ final class SessionWriter {
 
     func stopAndFinalize() async throws {
         pollingTask?.cancel()
+        // The poller owns writes to AVAudioFile. Wait for its final drain
+        // before closing the files or reading them back for the mix.
+        try await pollingTask?.value
+        pollingTask = nil
 
         let dropped = droppedFrames
         if dropped > 0 {
@@ -130,14 +160,25 @@ final class SessionWriter {
         youFile = nil
         themFile = nil
         
-        try await muxToM4A()
+        try await Self.muxToM4A(youTrackURL: youTrackURL, themTrackURL: themTrackURL, m4aURL: m4aURL)
         
         if FileManager.default.fileExists(atPath: incompleteMarkerURL.path) {
             try FileManager.default.removeItem(at: incompleteMarkerURL)
         }
     }
     
-    private func muxToM4A() async throws {
+    /// Salvage a stopped session whose raw tracks survived but whose mix did not.
+    static func rebuildMix(sessionID: UUID) async throws {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let sessionURL = appSupport.appendingPathComponent("Atrium/Sessions/\(sessionID.uuidString)")
+        try await muxToM4A(
+            youTrackURL: sessionURL.appendingPathComponent("tracks/you.caf"),
+            themTrackURL: sessionURL.appendingPathComponent("tracks/them.caf"),
+            m4aURL: sessionURL.appendingPathComponent("session.m4a")
+        )
+    }
+
+    private static func muxToM4A(youTrackURL: URL, themTrackURL: URL, m4aURL: URL) async throws {
         let composition = AVMutableComposition()
 
         // Either side can be empty and the session is still worth keeping: a
@@ -146,14 +187,13 @@ final class SessionWriter {
         var mixedAny = false
 
         for url in [youTrackURL, themTrackURL] {
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
             let asset = AVURLAsset(url: url)
             guard let sourceTrack = try await asset.loadTracks(withMediaType: .audio).first else {
-                logger.warning("No audio track in \(url.lastPathComponent); excluding it from the mix")
                 continue
             }
             let duration = try await asset.load(.duration)
             guard duration.isValid, duration.seconds > 0 else {
-                logger.warning("\(url.lastPathComponent) is empty; excluding it from the mix")
                 continue
             }
             guard let compTrack = composition.addMutableTrack(
