@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import Combine
 import OSLog
+import AVFoundation
 
 private enum TranscriptionPipelineError: LocalizedError {
     case noSpeechDetected
@@ -197,7 +198,12 @@ final class SessionController: ObservableObject {
             let transcriptPath = sessionDir.appendingPathComponent("transcript.json")
             
             do {
-                if !FileManager.default.fileExists(atPath: m4aPath.path) {
+                let duration = try? await AVURLAsset(url: m4aPath).load(.duration)
+                if duration?.isValid != true || duration?.seconds.isFinite != true
+                    || (duration?.seconds ?? 0) <= 0 {
+                    if FileManager.default.fileExists(atPath: m4aPath.path) {
+                        try FileManager.default.removeItem(at: m4aPath)
+                    }
                     try await SessionWriter.rebuildMix(sessionID: sessionID)
                 }
                 logger.info("Starting offline ASR pipeline")
@@ -253,7 +259,7 @@ final class SessionController: ObservableObject {
             
             self.isTranscribing = false
             self.transcriptionProgress = 0.0
-            self.activeMeeting = nil
+            if self.activeMeeting?.id == meeting.id { self.activeMeeting = nil }
             try? audioStore.container.mainContext.save()
     }
 }

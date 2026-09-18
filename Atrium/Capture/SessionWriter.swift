@@ -214,16 +214,7 @@ final class SessionWriter {
                                                        presetName: AVAssetExportPresetAppleM4A) else {
             throw SessionWriterError.exportUnavailable
         }
-        exportSession.outputURL = m4aURL
-        exportSession.outputFileType = .m4a
-
-        await exportSession.export()
-
-        // Report export failures instead of leaving a missing file for a later
-        // stage to trip over.
-        if let error = exportSession.error {
-            throw error
-        }
+        try await exportSession.export(to: m4aURL, as: .m4a)
         guard FileManager.default.fileExists(atPath: m4aURL.path) else {
             throw SessionWriterError.exportProducedNoFile
         }
