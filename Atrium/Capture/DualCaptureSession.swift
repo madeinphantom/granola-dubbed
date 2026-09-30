@@ -9,12 +9,17 @@ final class DualCaptureSession {
     private var writer: SessionWriter?
     private let clockAligner = ClockAligner()
     
-    // We assume 48kHz stereo for system tap, mono for mic.
+    // Both rings hold audio already converted to the file formats: 48 kHz
+    // interleaved stereo for system audio, 48 kHz mono for the mic.
     private let tapRingBuffer = AudioRingBuffer(capacityFrames: 48000 * 10, channels: 2) // 10 seconds buffer
     private let micRingBuffer = AudioRingBuffer(capacityFrames: 48000 * 10, channels: 1)
 
     /// Scratch space for folding multi-channel voice-processed mic input to mono.
     private var micDownmixBuffer: [Float] = []
+
+    /// Converts system audio to them.caf's format. Only one system source
+    /// (tap or ScreenCaptureKit) runs at a time, so they share it.
+    private let systemConverter = SystemAudioConverter()
     
     let sessionID = UUID()
 
@@ -23,6 +28,13 @@ final class DualCaptureSession {
     private(set) var micFramesReceived = 0
     private(set) var systemCallbacksReceived = 0
     private(set) var micInputFormatDescription: String?
+    /// Source format of system audio before conversion, e.g. "48000 Hz, 2 ch, interleaved".
+    var systemInputFormatDescription: String? { systemConverter.sourceFormatDescription }
+    /// System-audio frames written after conversion to 48 kHz.
+    private(set) var systemFramesWritten = 0
+    /// Tap callbacks dropped because their layout did not match the tap format.
+    private(set) var systemFormatMismatches = 0
+    var systemConversionFailures: Int { systemConverter.failedBuffers }
     
     private var sckFallback: SCKFallbackCapture?
     
@@ -58,8 +70,8 @@ final class DualCaptureSession {
         if captureSystemAudio {
           tapCapture = SystemAudioTap()
           do {
-            try tapCapture?.start { [weak self] bufferList, _, timeStamp in
-                self?.handleSystemAudio(bufferList: bufferList, timeStamp: timeStamp)
+            try tapCapture?.start { [weak self] buffer in
+                self?.handleSystemAudio(buffer: buffer)
             }
             logger.info("Using CoreAudio tap for system audio")
             systemAudioStarted = true
@@ -92,6 +104,7 @@ final class DualCaptureSession {
 
     func stop() async throws {
         tapCapture?.stop()
+        systemFormatMismatches = tapCapture?.mismatchedCallbacks ?? 0
         tapCapture = nil
         micCapture?.stop()
 
@@ -108,37 +121,17 @@ final class DualCaptureSession {
         writer = nil
     }
     
-    private func handleSystemAudio(bufferList: UnsafePointer<AudioBufferList>, timeStamp: AudioTimeStamp) {
+    private func handleSystemAudio(buffer: AVAudioPCMBuffer) {
         systemCallbacksReceived += 1
-        let numBuffers = Int(bufferList.pointee.mNumberBuffers)
-        
-        if numBuffers == 1 {
-            let buffer = bufferList.pointee.mBuffers
-            if let data = buffer.mData {
-                let floatData = data.assumingMemoryBound(to: Float.self)
-                let sampleCount = Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
-                tapRingBuffer.write(data: floatData, count: sampleCount)
-            }
-        } else {
-            let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: bufferList))
-            let framesPerBuffer = Int(buffers[0].mDataByteSize) / MemoryLayout<Float>.size
-            var interleaved = [Float](repeating: 0, count: framesPerBuffer * numBuffers)
-            
-            for ch in 0..<numBuffers {
-                if let data = buffers[ch].mData {
-                    let chData = data.assumingMemoryBound(to: Float.self)
-                    for frame in 0..<framesPerBuffer {
-                        interleaved[frame * numBuffers + ch] = chData[frame]
-                    }
-                }
-            }
-            
-            interleaved.withUnsafeBufferPointer { ptr in
-                tapRingBuffer.write(data: ptr.baseAddress!, count: interleaved.count)
-            }
+        writeSystemAudio(buffer)
+    }
+
+    private func writeSystemAudio(_ buffer: AVAudioPCMBuffer) {
+        systemFramesWritten += systemConverter.convert(buffer) { samples, count in
+            tapRingBuffer.write(data: samples, count: count)
         }
     }
-    
+
     private func handleMicAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         guard let channelData = buffer.floatChannelData else { return }
         let frameCount = Int(buffer.frameLength)
@@ -174,20 +167,19 @@ final class DualCaptureSession {
         }
     }
     
-    // SCK fallback handlers — extract float samples from CMSampleBuffer
+    // ScreenCaptureKit delivers non-interleaved Float32; copying its raw bytes
+    // into the interleaved ring put all left samples before all right ones.
     private func handleSCKSystemAudio(sampleBuffer: CMSampleBuffer) {
-        extractAndWrite(sampleBuffer: sampleBuffer, to: tapRingBuffer)
-    }
-    
-    private func extractAndWrite(sampleBuffer: CMSampleBuffer, to ringBuffer: AudioRingBuffer) {
-        guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
-        var length = 0
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        CMBlockBufferGetDataPointer(blockBuffer, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &dataPointer)
-        
-        guard let ptr = dataPointer else { return }
-        let floatPtr = UnsafeRawPointer(ptr).assumingMemoryBound(to: Float.self)
-        let count = length / MemoryLayout<Float>.size
-        ringBuffer.write(data: floatPtr, count: count)
+        guard let description = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+        let format = AVAudioFormat(cmAudioFormatDescription: description)
+        let frames = CMSampleBufferGetNumSamples(sampleBuffer)
+        guard frames > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else { return }
+        buffer.frameLength = AVAudioFrameCount(frames)
+        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sampleBuffer, at: 0, frameCount: Int32(frames), into: buffer.mutableAudioBufferList)
+        guard status == noErr else { return }
+        systemCallbacksReceived += 1
+        writeSystemAudio(buffer)
     }
 }

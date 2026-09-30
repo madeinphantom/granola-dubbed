@@ -331,3 +331,29 @@ file's 48 kHz mono, keeping only channel 0 (the echo-cancelled voice). The mic
 also starts before the system tap, so both tracks begin together.
 Lesson: normalise to the file format at capture time, and measure duration
 against the wall clock, not against the device's own frame count.
+
+## 2026-09-30 — System audio was static: the aggregate device was not the tap
+
+**What happened.** A 59 s recording (19:30:04 to 19:31:03 by file times)
+produced a 350 s them.caf of static. The samples' autocorrelation peaked at a
+6-frame lag, i.e. 12 floats per real frame: the IO block was delivering far
+more channels than the tap's 2, and `handleSystemAudio` flattened every buffer
+into a file declared 48 kHz stereo. A probe of the real aggregate showed why:
+it included the default output device as main subdevice, so its rate and
+stream layout followed that device. With AirPods in their headset profile
+(mic active) the block received **two stereo buffers at 24 kHz**. The
+Sep 11 check that saw "1 buffer, 2 ch, 48 kHz" was done on the built-in
+speakers and generalised from one device.
+
+Fix: the aggregate contains only the tap (probe: 1 buffer, 2 ch, 48 kHz, 1.0000x
+real time, with the AirPods mic active); every callback is validated against
+the tap's current format (`kAudioTapPropertyFormat`, with a change listener)
+and dropped and counted if it does not match; `SystemAudioConverter` resamples
+and interleaves to 48 kHz stereo. The SCK fallback had the same class of bug:
+it copied non-interleaved bytes as interleaved.
+
+**How to apply.** Never write a buffer list into a file whose format you
+assumed; read the source format, check the buffer layout against it, and
+convert. And an RMS check cannot detect static: the self-test now plays a
+1 kHz tone and requires it back at 1 kHz with SNR above 20 dB, and checks each
+track's duration against the wall clock.

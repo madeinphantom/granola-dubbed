@@ -15,6 +15,8 @@ import OSLog
 @MainActor
 enum SelfTest {
     static let phrase = "Atrium self test. The quick brown fox jumps over the lazy dog."
+    static let toneHz = 1000.0
+    static let toneSeconds = 3.0
     private static let logger = Logger(subsystem: "app.atrium.app", category: "SelfTest")
 
     /// Report path when launched with `--selftest <path>`.
@@ -41,6 +43,13 @@ enum SelfTest {
         var micFramesReceived: Int?
         var micInputFormat: String?
         var systemCallbacksReceived: Int?
+        var systemInputFormat: String?
+        var systemFramesWritten: Int?
+        var systemFormatMismatches: Int?
+        var systemConversionFailures: Int?
+        var wallClockSeconds: Double?
+        var toneHz: Double?
+        var toneWindows: [ToneAnalysis]?
         var transcript: String
         var passed: Bool
         var failures: [String]
@@ -59,6 +68,8 @@ enum SelfTest {
                          you: nil, them: nil,
                          micAuthorization: micAuthorization,
                          micFramesReceived: nil, micInputFormat: nil, systemCallbacksReceived: nil,
+                         systemInputFormat: nil, systemFramesWritten: nil, systemFormatMismatches: nil,
+                         systemConversionFailures: nil, wallClockSeconds: nil, toneHz: nil, toneWindows: nil,
                          transcript: "",
                          passed: false,
                          failures: ["Recording did not start: \(controller.lastError ?? "unknown")"]),
@@ -68,11 +79,29 @@ enum SelfTest {
         }
 
         let session = controller.activeSession
+        let recordingStarted = Date()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         await speak(phrase)
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        try? await Task.sleep(nanoseconds: 500_000_000)
 
+        // A pure tone proves system audio is clean, not just present: static
+        // and wrong-rate capture are as loud as real audio and pass an RMS
+        // check, but they cannot reproduce one clean frequency.
+        let toneURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("atrium-selftest-tone.wav")
+        var toneOffset: Double?
+        do {
+            try ToneAnalysis.writeTone(frequency: toneHz, seconds: toneSeconds, to: toneURL)
+            toneOffset = Date().timeIntervalSince(recordingStarted)
+            await run("/usr/bin/afplay", [toneURL.path])
+        } catch {
+            failures.append("Could not create the test tone: \(error.localizedDescription)")
+        }
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+        let wallClock = Date().timeIntervalSince(recordingStarted)
         await controller.stopRecordingAndTranscribe()
+        try? FileManager.default.removeItem(at: toneURL)
 
         let dir = Preferences.shared.sessionsDirectory.appendingPathComponent(meeting.id.uuidString)
         let you = measure(dir.appendingPathComponent("tracks/you.caf"))
@@ -80,14 +109,55 @@ enum SelfTest {
         let transcript = AudioStore.shared.loadTranscript(for: meeting)?
             .segments.map(\.text).joined(separator: " ") ?? ""
 
+        var toneWindows: [ToneAnalysis] = []
+        if let toneOffset, let track = ToneAnalysis.monoSamples(of: dir.appendingPathComponent("tracks/them.caf")) {
+            // Check the middle of the tone at several points, so intermittent
+            // corruption fails too. Edges are skipped to absorb start latency.
+            let window = Int(track.sampleRate * 0.3)
+            for offset in stride(from: toneOffset + 0.6, through: toneOffset + toneSeconds - 0.9, by: 0.4) {
+                let start = Int(offset * track.sampleRate)
+                guard start >= 0, start + window <= track.samples.count else {
+                    failures.append("them.caf ends before the test tone (\(String(format: "%.1f", offset))s)")
+                    break
+                }
+                let analysis = ToneAnalysis.analyse(track.samples[start..<(start + window)],
+                                                    sampleRate: track.sampleRate)
+                    ?? ToneAnalysis(frequency: 0, snrDB: -999)
+                toneWindows.append(analysis)
+            }
+            if toneWindows.contains(where: { abs($0.frequency - toneHz) > 5 }) {
+                failures.append("Test tone came back at the wrong frequency (expected \(Int(toneHz)) Hz)")
+            }
+            if toneWindows.contains(where: { $0.snrDB < 20 }) {
+                failures.append("Test tone is not clean in them.caf (SNR below 20 dB): system audio has noise or static")
+            }
+        } else if toneOffset != nil {
+            failures.append("Could not read them.caf to check the test tone")
+        }
+
         if meeting.state != .ready { failures.append("Meeting ended in state \(meeting.state.rawValue)") }
         if (session?.micFramesReceived ?? 0) == 0 { failures.append("Microphone delivered no frames (authorization: \(micAuthorization))") }
+        if (session?.systemFormatMismatches ?? 0) > 0 {
+            failures.append("\(session?.systemFormatMismatches ?? 0) system-audio callbacks did not match the tap format")
+        }
+        if (session?.systemConversionFailures ?? 0) > 0 {
+            failures.append("\(session?.systemConversionFailures ?? 0) system-audio buffers failed conversion")
+        }
         if controller.systemAudioUnavailable { failures.append("System audio unavailable (Screen Recording not granted)") }
         if let them, let you {
             if them.rms < 0.001 { failures.append("them.caf is silent (rms \(them.rms))") }
             let longer = max(you.durationSeconds, them.durationSeconds)
             if longer > 0, abs(you.durationSeconds - them.durationSeconds) / longer > 0.15 {
                 failures.append("Track durations disagree: you \(you.durationSeconds)s vs them \(them.durationSeconds)s")
+            }
+            // Measured against the wall clock, not each other: a wrong sample
+            // rate or extra channels stretch or shrink a track in real time.
+            // The mic starts about a second before the clock does.
+            if abs(them.durationSeconds - wallClock) > 1.0 {
+                failures.append("them.caf is \(them.durationSeconds)s for \(wallClock)s of recording")
+            }
+            if you.durationSeconds < wallClock - 1.0 || you.durationSeconds > wallClock + 2.5 {
+                failures.append("you.caf is \(you.durationSeconds)s for \(wallClock)s of recording")
             }
         } else {
             failures.append("Missing track file")
@@ -107,6 +177,13 @@ enum SelfTest {
                      micFramesReceived: session?.micFramesReceived,
                      micInputFormat: session?.micInputFormatDescription,
                      systemCallbacksReceived: session?.systemCallbacksReceived,
+                     systemInputFormat: session?.systemInputFormatDescription,
+                     systemFramesWritten: session?.systemFramesWritten,
+                     systemFormatMismatches: session?.systemFormatMismatches,
+                     systemConversionFailures: session?.systemConversionFailures,
+                     wallClockSeconds: wallClock,
+                     toneHz: toneHz,
+                     toneWindows: toneWindows,
                      transcript: transcript,
                      passed: failures.isEmpty,
                      failures: failures),
@@ -139,15 +216,19 @@ enum SelfTest {
     }
 
     private static func speak(_ text: String) async {
+        await run("/usr/bin/say", [text])
+    }
+
+    private static func run(_ executable: String, _ arguments: [String]) async {
         await withCheckedContinuation { continuation in
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/say")
-            process.arguments = [text]
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
             process.terminationHandler = { _ in continuation.resume() }
             do {
                 try process.run()
             } catch {
-                logger.error("Could not run say: \(error.localizedDescription)")
+                logger.error("Could not run \(executable): \(error.localizedDescription)")
                 continuation.resume()
             }
         }

@@ -17,7 +17,7 @@ Atrium/
 
 ## How it works
 
-1. **Dual capture.** `SystemAudioTap` intercepts system audio via a private `CATapDescription` + aggregate device (pre-volume, 48kHz stereo). `MicCapture` uses AVAudioEngine with Voice Processing for mic. Both feed into lock-free `AudioRingBuffer` instances.
+1. **Dual capture.** `SystemAudioTap` intercepts system audio via a private `CATapDescription` in a tap-only aggregate device; `SystemAudioConverter` converts whatever rate and layout the tap delivers to 48 kHz stereo. `MicCapture` uses AVAudioEngine with Voice Processing for mic. Both feed into lock-free `AudioRingBuffer` instances.
 2. **Fallback.** If the CoreAudio tap fails (permissions, older macOS), the app falls back to `SCKFallbackCapture` using ScreenCaptureKit.
 3. **Writing.** `SessionWriter` polls the ring buffers at 50ms intervals and writes to `you.caf` (mic) and `them.caf` (system). On stop, it muxes both into a single `session.m4a` via `AVAssetExportSession`.
 4. **Transcription.** `ASREngine` runs WhisperKit (large-v3-turbo) on the M4A file. `DualChannelAssigner` calculates RMS energy on each track using Accelerate (`vDSP_rmsqv`) to determine who's speaking when.

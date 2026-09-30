@@ -1,55 +1,48 @@
 import CoreAudio
 import AudioToolbox
 import AVFoundation
+import os
 
 enum TapCaptureError: Error {
     case tapCreateFailed(OSStatus)
     case aggregateCreateFailed(OSStatus)
     case ioProcCreateFailed(OSStatus)
     case deviceStartFailed(OSStatus)
-    case noDefaultOutput
+    case formatUnavailable(OSStatus)
 }
 
 final class SystemAudioTap {
     private var tapID: AudioObjectID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID: AudioObjectID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
+    private var formatListener: AudioObjectPropertyListenerBlock?
+    private let listenerQueue = DispatchQueue(label: "atrium.tap.format")
 
-    private func defaultOutputDeviceUID() -> String? {
-        var defaultOutputDeviceID = AudioDeviceID(kAudioObjectUnknown)
-        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &propertyAddress,
-            0,
-            nil,
-            &propertySize,
-            &defaultOutputDeviceID
-        )
-        guard status == noErr, defaultOutputDeviceID != kAudioObjectUnknown else { return nil }
+    /// The tap's stream format. It follows the output device, so it can
+    /// change mid-session (for example when AirPods switch to their headset
+    /// profile); the IO block reads it on every callback.
+    private let tapFormat = OSAllocatedUnfairLock(initialState: AudioStreamBasicDescription())
 
-        var uidString: CFString?
-        propertySize = UInt32(MemoryLayout<CFString?>.size)
-        propertyAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyDeviceUID,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        let uidStatus = AudioObjectGetPropertyData(
-            defaultOutputDeviceID,
-            &propertyAddress,
-            0,
-            nil,
-            &propertySize,
-            &uidString
-        )
-        guard uidStatus == noErr, let uid = uidString as String? else { return nil }
-        return uid
+    /// Callbacks whose buffers did not match the tap's format and were
+    /// dropped rather than written as garbage.
+    private let mismatchCounter = OSAllocatedUnfairLock(initialState: 0)
+    var mismatchedCallbacks: Int { mismatchCounter.withLock { $0 } }
+
+    /// The tap's format when capture started, for diagnostics.
+    private(set) var startFormatDescription: String?
+
+    private static var formatAddress: AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(mSelector: kAudioTapPropertyFormat,
+                                   mScope: kAudioObjectPropertyScopeGlobal,
+                                   mElement: kAudioObjectPropertyElementMain)
+    }
+
+    private static func readFormat(of tap: AudioObjectID) -> (OSStatus, AudioStreamBasicDescription) {
+        var address = formatAddress
+        var asbd = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        let status = AudioObjectGetPropertyData(tap, &address, 0, nil, &size, &asbd)
+        return (status, asbd)
     }
 
     /// Translates a Unix pid into the AudioObjectID of its audio process.
@@ -80,8 +73,13 @@ final class SystemAudioTap {
         return objectID
     }
 
+    /// Starts capturing all system audio except Atrium's own.
+    ///
+    /// `handler` receives each IO cycle as a buffer in the tap's own format,
+    /// which is valid only for the duration of the call. Callers must convert
+    /// it (see `SystemAudioConverter`) rather than assume a rate or layout.
     func start(excludingPids: [pid_t] = [pid_t(getpid())],
-              handler: @escaping (UnsafePointer<AudioBufferList>, UInt32, AudioTimeStamp) -> Void) throws {
+               handler: @escaping (AVAudioPCMBuffer) -> Void) throws {
         let excludedObjects = excludingPids.compactMap { audioObjectID(forPID: $0) }
         let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: excludedObjects)
         desc.uuid = UUID()
@@ -97,10 +95,33 @@ final class SystemAudioTap {
         self.tapID = tap
         let tapUID = desc.uuid.uuidString
 
-        guard let outputUID = defaultOutputDeviceUID() else {
-            throw TapCaptureError.noDefaultOutput
+        let (formatStatus, initialFormat) = Self.readFormat(of: tap)
+        guard formatStatus == noErr, initialFormat.mSampleRate > 0, initialFormat.mChannelsPerFrame > 0 else {
+            stop()
+            throw TapCaptureError.formatUnavailable(formatStatus)
+        }
+        tapFormat.withLock { $0 = initialFormat }
+        if let format = SystemAudioConverter.format(for: initialFormat) {
+            startFormatDescription = SystemAudioConverter.describe(format)
         }
 
+        let formatBox = tapFormat
+        let listener: AudioObjectPropertyListenerBlock = { _, _ in
+            let (status, updated) = Self.readFormat(of: tap)
+            if status == noErr, updated.mSampleRate > 0 { formatBox.withLock { $0 = updated } }
+        }
+        var listenerAddress = Self.formatAddress
+        if AudioObjectAddPropertyListenerBlock(tap, &listenerAddress, listenerQueue, listener) == noErr {
+            formatListener = listener
+        }
+
+        // The aggregate contains the tap and nothing else. It used to include
+        // the default output device as its main subdevice, which made the
+        // aggregate run at that device's rate and expose that device's input
+        // streams as extra buffers: with AirPods in their headset profile the
+        // IO block received two stereo buffers at 24 kHz, and another session
+        // received 12 channels per frame. All of it was written into them.caf
+        // as 48 kHz stereo — a 59 s recording became 350 s of static.
         let aggUID = UUID().uuidString
         let dict: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Atrium Tap Aggregate",
@@ -108,10 +129,6 @@ final class SystemAudioTap {
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,
             kAudioAggregateDeviceTapAutoStartKey: true,
-            kAudioAggregateDeviceMainSubDeviceKey: outputUID,
-            kAudioAggregateDeviceSubDeviceListKey: [
-                [kAudioSubDeviceUIDKey: outputUID]
-            ],
             kAudioAggregateDeviceTapListKey: [
                 [
                     kAudioSubTapUIDKey: tapUID,
@@ -122,18 +139,37 @@ final class SystemAudioTap {
 
         var agg = AudioObjectID(kAudioObjectUnknown)
         let aggStatus = AudioHardwareCreateAggregateDevice(dict as CFDictionary, &agg)
-        guard aggStatus == noErr else { throw TapCaptureError.aggregateCreateFailed(aggStatus) }
+        guard aggStatus == noErr else {
+            stop()
+            throw TapCaptureError.aggregateCreateFailed(aggStatus)
+        }
         self.aggregateID = agg
 
-        let block: AudioDeviceIOBlock = { inNow, inInputData, _, _, _ in
-            // Derive the real frame count from the first buffer rather than assuming one.
-            let abl = UnsafeMutableAudioBufferListPointer(
-                UnsafeMutablePointer(mutating: inInputData))
-            guard let first = abl.first, first.mDataByteSize > 0 else { return }
-            let bytesPerFrame = UInt32(MemoryLayout<Float>.size)
-            let channelsInBuffer = max(first.mNumberChannels, 1)
-            let frameCount = first.mDataByteSize / (bytesPerFrame * channelsInBuffer)
-            handler(inInputData, frameCount, inNow.pointee)
+        let mismatches = mismatchCounter
+        // Called serially on one queue, so the cached format needs no lock.
+        var cachedDescription = AudioStreamBasicDescription()
+        var cachedFormat: AVAudioFormat?
+        let block: AudioDeviceIOBlock = { _, inInputData, _, _, _ in
+            let asbd = formatBox.withLock { $0 }
+            if cachedFormat == nil || !Self.sameFormat(asbd, cachedDescription) {
+                cachedFormat = SystemAudioConverter.format(for: asbd)
+                cachedDescription = asbd
+            }
+            guard let format = cachedFormat else { return }
+
+            let abl = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inInputData))
+            guard let frames = Self.frameCount(abl, matching: asbd) else {
+                if abl.contains(where: { $0.mDataByteSize > 0 }) {
+                    mismatches.withLock { $0 += 1 }
+                }
+                return
+            }
+            guard frames > 0,
+                  let buffer = AVAudioPCMBuffer(pcmFormat: format,
+                                                bufferListNoCopy: inInputData,
+                                                deallocator: nil) else { return }
+            buffer.frameLength = AVAudioFrameCount(frames)
+            handler(buffer)
         }
         var procID: AudioDeviceIOProcID?
         let procStatus = AudioDeviceCreateIOProcIDWithBlock(
@@ -152,7 +188,43 @@ final class SystemAudioTap {
         }
     }
 
+    private static func sameFormat(_ a: AudioStreamBasicDescription, _ b: AudioStreamBasicDescription) -> Bool {
+        a.mSampleRate == b.mSampleRate && a.mFormatID == b.mFormatID && a.mFormatFlags == b.mFormatFlags
+            && a.mBytesPerFrame == b.mBytesPerFrame && a.mChannelsPerFrame == b.mChannelsPerFrame
+            && a.mBitsPerChannel == b.mBitsPerChannel
+    }
+
+    /// Frames in `abl` if its layout is exactly what `asbd` describes, else nil.
+    ///
+    /// The buffer list must be checked against the format, never assumed:
+    /// writing a list with extra buffers or channels as if it were the tap's
+    /// stereo stream is what turned system audio into static.
+    static func frameCount(_ abl: UnsafeMutableAudioBufferListPointer,
+                           matching asbd: AudioStreamBasicDescription) -> Int? {
+        let channels = Int(asbd.mChannelsPerFrame)
+        let bytesPerFrame = Int(asbd.mBytesPerFrame)
+        guard channels > 0, bytesPerFrame > 0 else { return nil }
+        let nonInterleaved = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0
+        let expectedBuffers = nonInterleaved ? channels : 1
+        let channelsPerBuffer = nonInterleaved ? 1 : channels
+        guard abl.count == expectedBuffers else { return nil }
+        var frames: Int?
+        for buffer in abl {
+            guard Int(buffer.mNumberChannels) == channelsPerBuffer,
+                  Int(buffer.mDataByteSize) % bytesPerFrame == 0 else { return nil }
+            let count = Int(buffer.mDataByteSize) / bytesPerFrame
+            if let frames, frames != count { return nil }
+            frames = count
+        }
+        return frames
+    }
+
     func stop() {
+        if let listener = formatListener {
+            var address = Self.formatAddress
+            AudioObjectRemovePropertyListenerBlock(tapID, &address, listenerQueue, listener)
+            formatListener = nil
+        }
         if let procID = ioProcID {
             AudioDeviceStop(aggregateID, procID)
             AudioDeviceDestroyIOProcID(aggregateID, procID)

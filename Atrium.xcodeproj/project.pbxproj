@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0466DCC93F542DE6047EEAFD /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CED946FDB908F622AF9373D /* AudioRingBuffer.swift */; };
 		0742EB58387B957FEA318144 /* MicCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95003C6EC1997FE6A7F5115B /* MicCapture.swift */; };
+		079CBD1C5FDBDB51B6803BE1 /* ToneAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A272E7D5E8104C1ADCA5950 /* ToneAnalysis.swift */; };
 		0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */; };
 		1D1A3DF89DDDE1744ED93E00 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B883129BC8E94E1EAE003B /* UpdaterService.swift */; };
 		33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F762CD9318C85421E47AB36 /* PreferencesTests.swift */; };
@@ -30,9 +31,11 @@
 		954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */; };
 		9BEDD5F1D50008FF3F1AA7B4 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7C4BEC9F45E32692199F0A95 /* WhisperKit */; };
 		A78FA557A92A3371546B0F95 /* AudioRingBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515C4494CCDFAF67035F7AB6 /* AudioRingBufferTests.swift */; };
+		ABCE560ECD9AB5A4F2434F08 /* SystemAudioConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4DFA997EB276BFF6B27881 /* SystemAudioConverterTests.swift */; };
 		AE981FE1B3FBB0A386E9669A /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */; };
 		BFB76B567929F547DDEC345B /* SCKFallbackCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24638F750630307901676C34 /* SCKFallbackCapture.swift */; };
 		C7066FCDE41AFE6CC8227FD7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30245E25CBC344490C1E0F3F /* Assets.xcassets */; };
+		CA25338C6D92F3079F386B8C /* SystemAudioConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641DDCBDBD9021F5A62674E0 /* SystemAudioConverter.swift */; };
 		CDA193BB27A26BB208D62C09 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FB878C5BA2616E77D02069 /* ASREngine.swift */; };
 		D068387DE82C47730D8DFD55 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE554720AF9902F7B3E23BDC /* Models.swift */; };
 		D6CFF80327BA7D28AF12FF07 /* AtriumApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C2523289F5715D177C7174D /* AtriumApp.swift */; };
@@ -78,12 +81,15 @@
 		5C7977D9D541C7505CD04626 /* AudioPlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerViewModel.swift; sourceTree = "<group>"; };
 		61996351FC0B85798284AB60 /* Atrium.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atrium.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6298A413D72C0FE87EAC2A87 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		641DDCBDBD9021F5A62674E0 /* SystemAudioConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioConverter.swift; sourceTree = "<group>"; };
 		6EC51B106E865FB31F47E8D2 /* MicDownmixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicDownmixTests.swift; sourceTree = "<group>"; };
 		76AF1B107B3E57C4DBB81940 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		79619B30A1DDFE5B01C1595A /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
+		7C4DFA997EB276BFF6B27881 /* SystemAudioConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioConverterTests.swift; sourceTree = "<group>"; };
 		7F2FBC339FD123A68CD41B84 /* TrackMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMergeTests.swift; sourceTree = "<group>"; };
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
+		9A272E7D5E8104C1ADCA5950 /* ToneAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToneAnalysis.swift; sourceTree = "<group>"; };
 		9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStoreDeletePathTests.swift; sourceTree = "<group>"; };
 		AC4058C8598A2AB966495619 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortformerDiarizer.swift; sourceTree = "<group>"; };
@@ -131,6 +137,7 @@
 				6298A413D72C0FE87EAC2A87 /* Preferences.swift */,
 				AC4058C8598A2AB966495619 /* SelfTest.swift */,
 				FCC56F253DD12443ED83CABC /* SessionController.swift */,
+				9A272E7D5E8104C1ADCA5950 /* ToneAnalysis.swift */,
 				C5B883129BC8E94E1EAE003B /* UpdaterService.swift */,
 			);
 			path = Application;
@@ -182,6 +189,7 @@
 				95003C6EC1997FE6A7F5115B /* MicCapture.swift */,
 				24638F750630307901676C34 /* SCKFallbackCapture.swift */,
 				BAB5218EABB34A8C7C9490F2 /* SessionWriter.swift */,
+				641DDCBDBD9021F5A62674E0 /* SystemAudioConverter.swift */,
 				24A6E2228711C7E02DA21426 /* SystemAudioTap.swift */,
 			);
 			path = Capture;
@@ -209,6 +217,7 @@
 				6EC51B106E865FB31F47E8D2 /* MicDownmixTests.swift */,
 				0F762CD9318C85421E47AB36 /* PreferencesTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
+				7C4DFA997EB276BFF6B27881 /* SystemAudioConverterTests.swift */,
 				7F2FBC339FD123A68CD41B84 /* TrackMergeTests.swift */,
 				ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */,
 			);
@@ -378,7 +387,9 @@
 				5D54E07301823A180453CD28 /* SessionWriter.swift in Sources */,
 				DDD04F206F77EB9D9F06F17B /* SettingsView.swift in Sources */,
 				0ECBC46EDAC1F06ADE8F654C /* SortformerDiarizer.swift in Sources */,
+				CA25338C6D92F3079F386B8C /* SystemAudioConverter.swift in Sources */,
 				EA91A4FF9A1D03A3B16A76E0 /* SystemAudioTap.swift in Sources */,
+				079CBD1C5FDBDB51B6803BE1 /* ToneAnalysis.swift in Sources */,
 				F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */,
 				1D1A3DF89DDDE1744ED93E00 /* UpdaterService.swift in Sources */,
 			);
@@ -396,6 +407,7 @@
 				EBFF056BD4CC640A51B93AB9 /* MicDownmixTests.swift in Sources */,
 				33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
+				ABCE560ECD9AB5A4F2434F08 /* SystemAudioConverterTests.swift in Sources */,
 				4F028BCDFDAEF24FFE965153 /* TrackMergeTests.swift in Sources */,
 				8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */,
 			);
@@ -435,7 +447,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -443,7 +455,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.3;
+				MARKETING_VERSION = 0.4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -457,7 +469,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -465,7 +477,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.3;
+				MARKETING_VERSION = 0.4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
