@@ -37,6 +37,9 @@ enum SelfTest {
         var lastError: String?
         var you: TrackReport?
         var them: TrackReport?
+        var micAuthorization: String
+        var micFramesReceived: Int?
+        var systemCallbacksReceived: Int?
         var transcript: String
         var passed: Bool
         var failures: [String]
@@ -52,7 +55,10 @@ enum SelfTest {
                          systemAudioUnavailable: controller.systemAudioUnavailable,
                          finalState: "not-started",
                          lastError: controller.lastError,
-                         you: nil, them: nil, transcript: "",
+                         you: nil, them: nil,
+                         micAuthorization: micAuthorization,
+                         micFramesReceived: nil, systemCallbacksReceived: nil,
+                         transcript: "",
                          passed: false,
                          failures: ["Recording did not start: \(controller.lastError ?? "unknown")"]),
                   to: reportURL)
@@ -60,6 +66,7 @@ enum SelfTest {
             return
         }
 
+        let session = controller.activeSession
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         await speak(phrase)
         try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -73,6 +80,7 @@ enum SelfTest {
             .segments.map(\.text).joined(separator: " ") ?? ""
 
         if meeting.state != .ready { failures.append("Meeting ended in state \(meeting.state.rawValue)") }
+        if (session?.micFramesReceived ?? 0) == 0 { failures.append("Microphone delivered no frames (authorization: \(micAuthorization))") }
         if controller.systemAudioUnavailable { failures.append("System audio unavailable (Screen Recording not granted)") }
         if let them, let you {
             if them.rms < 0.001 { failures.append("them.caf is silent (rms \(them.rms))") }
@@ -94,6 +102,9 @@ enum SelfTest {
                      finalState: meeting.state.rawValue,
                      lastError: controller.lastError,
                      you: you, them: them,
+                     micAuthorization: micAuthorization,
+                     micFramesReceived: session?.micFramesReceived,
+                     systemCallbacksReceived: session?.systemCallbacksReceived,
                      transcript: transcript,
                      passed: failures.isEmpty,
                      failures: failures),
@@ -102,6 +113,16 @@ enum SelfTest {
         // A self-test must not leave a recording of the room behind.
         AudioStore.shared.delete(meeting: meeting)
         NSApp.terminate(nil)
+    }
+
+    private static var micAuthorization: String {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return "authorized"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        case .notDetermined: return "notDetermined"
+        @unknown default: return "unknown"
+        }
     }
 
     private static var appVersion: String {

@@ -17,6 +17,11 @@ final class DualCaptureSession {
     private var micDownmixBuffer: [Float] = []
     
     let sessionID = UUID()
+
+    /// Frames delivered by each capture source, for diagnostics. Written from
+    /// audio threads; read only after `stop()` has returned.
+    private(set) var micFramesReceived = 0
+    private(set) var systemCallbacksReceived = 0
     
     private var sckFallback: SCKFallbackCapture?
     
@@ -101,6 +106,7 @@ final class DualCaptureSession {
     }
     
     private func handleSystemAudio(bufferList: UnsafePointer<AudioBufferList>, timeStamp: AudioTimeStamp) {
+        systemCallbacksReceived += 1
         let numBuffers = Int(bufferList.pointee.mNumberBuffers)
         
         if numBuffers == 1 {
@@ -134,6 +140,7 @@ final class DualCaptureSession {
         guard let channelData = buffer.floatChannelData else { return }
         let frameCount = Int(buffer.frameLength)
         guard frameCount > 0 else { return }
+        micFramesReceived += frameCount
 
         let channels = Int(buffer.format.channelCount)
 
