@@ -357,3 +357,21 @@ assumed; read the source format, check the buffer layout against it, and
 convert. And an RMS check cannot detect static: the self-test now plays a
 1 kHz tone and requires it back at 1 kHz with SNR above 20 dB, and checks each
 track's duration against the wall clock.
+
+## 2026-09-30 — Voice processing ducked the audio we were recording by ~22 dB
+
+**What happened.** With the static fixed, the 0.4.4 self-test tone came back
+at 1000 Hz but at 0.028x its source level at 69% output volume, and the tone
+check failed because Chrome's music (also in them.caf) was as loud as the
+tone. Cause: AVAudioEngine voice processing ducks all other audio by default.
+Starting a recording turned the meeting down in the user's ears and in
+them.caf. With `voiceProcessingOtherAudioDuckingConfiguration` at `.min`
+(0.4.5) the same tone came back at 0.35x: ~22 dB louder, and them.caf RMS rose
+from 0.008 to 0.131.
+
+**How to apply.** Enabling voice processing is not local to the mic: it
+changes system output too. Measure the captured level against a known source
+level, not just "non-zero". And a self-test on a real Mac shares it with
+whatever else is playing: design the check to tolerate legitimate background
+audio (the tone analysis high-passes at 300 Hz, where broken-capture damage
+lands and music mostly does not) instead of assuming a silent machine.
