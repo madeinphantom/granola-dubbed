@@ -318,3 +318,16 @@ the log said so in both cases.
    while `say` speaks a known phrase, transcribes, checks both tracks and the
    transcript, writes a JSON report, deletes the recording, and quits.
    **Run it before calling any release done:** `atrium selftest`.
+
+## 2026-09-30 — Mic sample rate is whatever voice processing negotiates
+
+The first passing-transcript self-test still flagged you.caf at 3.8 s against
+them.caf at 8.15 s. Voice processing on this Mac delivered **24 kHz / 3ch**
+(an earlier session had delivered 48 kHz / 9ch), and those frames were written
+into a file declared 48 kHz, halving the duration. Earlier "verified 1.00x"
+checks measured frames against the device's own rate, so they could not catch
+a rate mismatch. Now every mic buffer passes through AVAudioConverter to the
+file's 48 kHz mono, keeping only channel 0 (the echo-cancelled voice). The mic
+also starts before the system tap, so both tracks begin together.
+Lesson: normalise to the file format at capture time, and measure duration
+against the wall clock, not against the device's own frame count.

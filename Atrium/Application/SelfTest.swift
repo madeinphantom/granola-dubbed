@@ -39,6 +39,7 @@ enum SelfTest {
         var them: TrackReport?
         var micAuthorization: String
         var micFramesReceived: Int?
+        var micInputFormat: String?
         var systemCallbacksReceived: Int?
         var transcript: String
         var passed: Bool
@@ -57,7 +58,7 @@ enum SelfTest {
                          lastError: controller.lastError,
                          you: nil, them: nil,
                          micAuthorization: micAuthorization,
-                         micFramesReceived: nil, systemCallbacksReceived: nil,
+                         micFramesReceived: nil, micInputFormat: nil, systemCallbacksReceived: nil,
                          transcript: "",
                          passed: false,
                          failures: ["Recording did not start: \(controller.lastError ?? "unknown")"]),
@@ -104,6 +105,7 @@ enum SelfTest {
                      you: you, them: them,
                      micAuthorization: micAuthorization,
                      micFramesReceived: session?.micFramesReceived,
+                     micInputFormat: session?.micInputFormatDescription,
                      systemCallbacksReceived: session?.systemCallbacksReceived,
                      transcript: transcript,
                      passed: failures.isEmpty,

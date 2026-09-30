@@ -3,6 +3,8 @@ import AVFoundation
 final class MicCapture {
     let engine = AVAudioEngine()
     private var tapInstalled = false
+    /// Format the input node delivered before conversion, for diagnostics.
+    private(set) var inputFormat: AVAudioFormat?
 
     func start(handler: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) throws {
         let input = engine.inputNode
@@ -25,8 +27,44 @@ final class MicCapture {
             throw MicCaptureError.invalidInputFormat
         }
 
+        inputFormat = format
+
+        // you.caf is written as 48 kHz mono. Voice processing does not keep the
+        // hardware rate (a 24 kHz input made a ~8 s session produce a 3.8 s
+        // you.caf), so convert every buffer to the file's format here instead
+        // of trusting whatever the input node negotiates.
+        guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                               sampleRate: 48_000,
+                                               channels: 1,
+                                               interleaved: false),
+              let converter = AVAudioConverter(from: format, to: outputFormat) else {
+            throw MicCaptureError.invalidInputFormat
+        }
+        if format.channelCount > 1 {
+            // With voice processing, channel 0 is the echo-cancelled voice and
+            // the rest are raw capsules. Keep channel 0: mixing in the raw
+            // channels would bring the speaker echo back.
+            converter.channelMap = [0]
+        }
+
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { buf, time in
-            handler(buf, time)
+            let ratio = outputFormat.sampleRate / format.sampleRate
+            let capacity = AVAudioFrameCount(Double(buf.frameLength) * ratio) + 32
+            guard let out = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
+            var consumed = false
+            var error: NSError?
+            converter.convert(to: out, error: &error) { _, status in
+                if consumed {
+                    status.pointee = .noDataNow
+                    return nil
+                }
+                consumed = true
+                status.pointee = .haveData
+                return buf
+            }
+            if error == nil, out.frameLength > 0 {
+                handler(out, time)
+            }
         }
         tapInstalled = true
         do {

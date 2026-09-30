@@ -22,6 +22,7 @@ final class DualCaptureSession {
     /// audio threads; read only after `stop()` has returned.
     private(set) var micFramesReceived = 0
     private(set) var systemCallbacksReceived = 0
+    private(set) var micInputFormatDescription: String?
     
     private var sckFallback: SCKFallbackCapture?
     
@@ -31,6 +32,26 @@ final class DualCaptureSession {
     func start(captureSystemAudio: Bool) async throws -> Bool {
         clockAligner.reset()
         writer = try SessionWriter(sessionID: sessionID, tapBuffer: tapRingBuffer, micBuffer: micRingBuffer)
+
+        // The microphone starts first: voice-processing startup takes about a
+        // second, and starting it after the system tap left you.caf shorter
+        // than them.caf and misaligned for speaker attribution.
+        // MicCapture is the sole microphone source, including in SCK fallback
+        // mode. This keeps one format/downmix path and prevents duplicate mic.
+        let mic = MicCapture()
+        do {
+            try mic.start { [weak self] buffer, time in
+                self?.handleMicAudio(buffer: buffer, time: time)
+            }
+            micCapture = mic
+            if let f = mic.inputFormat {
+                micInputFormatDescription = "\(Int(f.sampleRate)) Hz, \(f.channelCount) ch"
+            }
+        } catch {
+            writer?.discardUnstartedSession()
+            writer = nil
+            throw error
+        }
 
         var systemAudioStarted = false
         // Try CoreAudio tap first (preferred — pre-volume, lower latency)
@@ -63,24 +84,6 @@ final class DualCaptureSession {
                 logger.error("SCK fallback also failed; continuing with microphone only: \(error.localizedDescription)")
             }
           }
-        }
-
-        // MicCapture is the sole microphone source, including in SCK fallback
-        // mode. This keeps one format/downmix path and prevents duplicate mic.
-        let mic = MicCapture()
-        do {
-            try mic.start { [weak self] buffer, time in
-                self?.handleMicAudio(buffer: buffer, time: time)
-            }
-            micCapture = mic
-        } catch {
-            tapCapture?.stop()
-            tapCapture = nil
-            try? await sckFallback?.stop()
-            sckFallback = nil
-            writer?.discardUnstartedSession()
-            writer = nil
-            throw error
         }
 
         writer?.startPolling()
