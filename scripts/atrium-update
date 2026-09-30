@@ -125,6 +125,23 @@ cmd_download() {
 }
 
 cmd_open()   { open -a "$APP"; }
+
+# Record a few seconds of a spoken test phrase through the installed app and
+# verify capture, mix and transcription end to end. Deletes its recording.
+cmd_selftest() {
+  [ -d "$APP" ] || { red "Atrium is not installed. Run: atrium download"; exit 1; }
+  local report; report="$(mktemp -d)/atrium-selftest.json"
+  if pgrep -x Atrium >/dev/null; then
+    osascript -e 'quit app "Atrium"' 2>/dev/null || true; sleep 2
+  fi
+  cyan "==> Running self-test (speaks a phrase aloud; first run may download the speech model)"
+  open -n -a "$APP" --args --selftest "$report"
+  local waited=0
+  while [ ! -f "$report" ] && [ $waited -lt 900 ]; do sleep 3; waited=$((waited+3)); done
+  [ -f "$report" ] || { red "Self-test produced no report after ${waited}s."; exit 1; }
+  cat "$report"
+  if grep -q '"passed" : true' "$report"; then green "SELF-TEST PASSED"; else red "SELF-TEST FAILED"; exit 1; fi
+}
 cmd_status() {
   cd "$REPO"
   echo "Repo:      $REPO"
@@ -145,6 +162,7 @@ case "${1:-update}" in
   update)   cmd_update ;;
   build)    cmd_build ;;
   download) cmd_download ;;
+  selftest) cmd_selftest ;;
   open)    cmd_open ;;
   status)  cmd_status ;;
   *)
@@ -153,6 +171,7 @@ case "${1:-update}" in
     echo "  download  Install the prebuilt release (no Xcode needed)"
     echo "  build     Rebuild and install without pulling"
     echo "  open    Launch Atrium"
+    echo "  selftest  Record a spoken phrase and verify the whole pipeline"
     echo "  status  Show installed vs available version"
     ;;
 esac
