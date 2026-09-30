@@ -86,27 +86,6 @@ struct TranscriptionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Slider(value: $prefs.speakerSensitivity, in: 0.001...0.1) {
-                        Text("Speaker sensitivity")
-                    } minimumValueLabel: {
-                        Text("Sensitive").font(.caption2)
-                    } maximumValueLabel: {
-                        Text("Strict").font(.caption2)
-                    }
-                    Text(String(format: "Energy threshold: %.3f", prefs.speakerSensitivity))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            } header: {
-                Text("Speaker attribution")
-            } footer: {
-                Text("How loud a track must be to count as someone speaking. Lower catches quiet speakers but may pick up background noise. Applies to new transcriptions.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .formStyle(.grouped)
     }

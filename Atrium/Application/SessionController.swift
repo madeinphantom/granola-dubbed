@@ -43,7 +43,6 @@ final class SessionController: ObservableObject {
     
     let audioStore = AudioStore.shared
     private let asrEngine = ASREngine()
-    private let dualChannelAssigner = DualChannelAssigner()
     private let transcriptAligner = TranscriptAligner()
     
     // Check for incomplete sessions on launch and mark them as failed
@@ -214,35 +213,33 @@ final class SessionController: ObservableObject {
                 }
                 logger.info("Starting offline ASR pipeline")
                 asrEngine.modelOverride = Preferences.shared.whisperModel.rawValue
-                let rawSegments = try await asrEngine.transcribe(audioURL: m4aPath) { progress in
-                    DispatchQueue.main.async {
-                        self.transcriptionProgress = progress
-                    }
-                }
-                
-                let speakerTurns = try dualChannelAssigner.assign(
-                    youTrackURL: youPath,
-                    themTrackURL: themPath,
-                    energyThreshold: Float(Preferences.shared.speakerSensitivity)
-                )
-                
+
+                // Transcribe each track on its own. The speaker is then known
+                // exactly (mic = you, system audio = them) instead of guessed
+                // from an energy threshold on a mix, and a quiet side cannot
+                // be drowned out by the other.
                 let youSpeakerID = UUID()
                 let themSpeakerID = UUID()
-                
-                let typedTurns: [(start: TimeInterval, end: TimeInterval, speakerId: UUID)] = speakerTurns.map { turn in
-                    let id = turn.speaker == "You" ? youSpeakerID : themSpeakerID
-                    return (start: turn.start, end: turn.end, speakerId: id)
+                var trackSegments: [URL: [TranscriptSegment]] = [:]
+                let tracks = [youPath, themPath]
+                for (index, track) in tracks.enumerated() {
+                    guard let file = try? AVAudioFile(forReading: track), file.length > 0 else { continue }
+                    do {
+                        trackSegments[track] = try await asrEngine.transcribe(audioURL: track) { progress in
+                            DispatchQueue.main.async {
+                                self.transcriptionProgress = (Float(index) + progress) / Float(tracks.count)
+                            }
+                        }
+                    } catch {
+                        logger.error("Transcribing \(track.lastPathComponent) failed: \(error.localizedDescription)")
+                    }
                 }
-                
-                // Some WhisperKit results have segment text but no word
-                // timings. Preserve that text with segment-level timing so a
-                // successful transcription cannot render as an empty page.
-                let allWords = TranscriptAligner.timedUnits(from: rawSegments)
-                guard !allWords.isEmpty else { throw TranscriptionPipelineError.noSpeechDetected }
-                let alignedSegments = transcriptAligner.align(words: allWords,
-                                                             speakerTurns: typedTurns,
-                                                             fallbackSpeakerId: themSpeakerID)
-                
+
+                let alignedSegments = TranscriptAligner.mergeTracks(
+                    local: trackSegments[youPath] ?? [], localSpeaker: youSpeakerID,
+                    remote: trackSegments[themPath] ?? [], remoteSpeaker: themSpeakerID)
+                guard !alignedSegments.isEmpty else { throw TranscriptionPipelineError.noSpeechDetected }
+
                 let transcriptDoc = TranscriptDocument(version: 1, language: "en", segments: alignedSegments)
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

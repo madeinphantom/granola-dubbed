@@ -20,6 +20,7 @@
 		4682D698E7465D91995563B5 /* RecPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6BDB428C05BD9641841942 /* RecPillView.swift */; };
 		49D1A12ECF2B7D873002AE55 /* AudioPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C7977D9D541C7505CD04626 /* AudioPlayerViewModel.swift */; };
 		4B5B397FC03074ACF6578EFC /* ASREngineTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0975E7FF172990AD097BA4A /* ASREngineTextTests.swift */; };
+		4F028BCDFDAEF24FFE965153 /* TrackMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2FBC339FD123A68CD41B84 /* TrackMergeTests.swift */; };
 		56C32024C2F1A502A6399630 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F49A288B57C46789C04E305 /* MenuBarView.swift */; };
 		5D54E07301823A180453CD28 /* SessionWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB5218EABB34A8C7C9490F2 /* SessionWriter.swift */; };
 		803F8F4AE190813373E2D55A /* AudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D3FBEFDCCF48A20DD74BCA /* AudioStore.swift */; };
@@ -80,6 +81,7 @@
 		6EC51B106E865FB31F47E8D2 /* MicDownmixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicDownmixTests.swift; sourceTree = "<group>"; };
 		76AF1B107B3E57C4DBB81940 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		79619B30A1DDFE5B01C1595A /* ClockAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockAligner.swift; sourceTree = "<group>"; };
+		7F2FBC339FD123A68CD41B84 /* TrackMergeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackMergeTests.swift; sourceTree = "<group>"; };
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
 		9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStoreDeletePathTests.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				6EC51B106E865FB31F47E8D2 /* MicDownmixTests.swift */,
 				0F762CD9318C85421E47AB36 /* PreferencesTests.swift */,
 				3A48622BA9C03E3BED540F04 /* SessionWriterDrainTests.swift */,
+				7F2FBC339FD123A68CD41B84 /* TrackMergeTests.swift */,
 				ECD0514C8812CCE743868408 /* TranscriptAlignerTests.swift */,
 			);
 			path = AtriumTests;
@@ -393,6 +396,7 @@
 				EBFF056BD4CC640A51B93AB9 /* MicDownmixTests.swift in Sources */,
 				33A59315F107D0E01E5EDD2F /* PreferencesTests.swift in Sources */,
 				954BB5806F863151E9D1C06E /* SessionWriterDrainTests.swift in Sources */,
+				4F028BCDFDAEF24FFE965153 /* TrackMergeTests.swift in Sources */,
 				8609FF1E44F751AF38C1B0C1 /* TranscriptAlignerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -431,7 +435,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -439,7 +443,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.2;
+				MARKETING_VERSION = 0.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -453,7 +457,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -461,7 +465,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.4.2;
+				MARKETING_VERSION = 0.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;

@@ -112,8 +112,14 @@ enum SelfTest {
                      failures: failures),
               to: reportURL)
 
-        // A self-test must not leave a recording of the room behind.
-        AudioStore.shared.delete(meeting: meeting)
+        // A passing self-test must not leave a recording of the room behind.
+        // A failing one keeps its audio next to the report as evidence.
+        if failures.isEmpty {
+            AudioStore.shared.delete(meeting: meeting)
+        } else {
+            let evidence = reportURL.deletingLastPathComponent().appendingPathComponent("evidence")
+            try? FileManager.default.copyItem(at: dir, to: evidence)
+        }
         NSApp.terminate(nil)
     }
 

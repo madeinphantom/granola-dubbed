@@ -12,6 +12,36 @@ final class TranscriptAligner {
         }
     }
 
+    /// Merges per-track transcripts into one conversation.
+    ///
+    /// Each track is transcribed on its own, so the speaker is known exactly:
+    /// microphone segments are the local user, system-audio segments are the
+    /// remote side. A microphone segment that overlaps a remote segment with
+    /// the same words is speaker bleed that echo cancellation missed, and is
+    /// dropped so the line is not attributed to both people.
+    static func mergeTracks(local: [TranscriptSegment], localSpeaker: UUID,
+                            remote: [TranscriptSegment], remoteSpeaker: UUID) -> [TranscriptSegment] {
+        func normalized(_ text: String) -> String {
+            text.lowercased().filter { $0.isLetter || $0.isNumber || $0 == " " }
+                .split(separator: " ").joined(separator: " ")
+        }
+        let remoteSegments = remote
+            .filter { !normalized($0.text).isEmpty }
+            .map { var s = $0; s.speakerId = remoteSpeaker; return s }
+        let localSegments = local
+            .filter { !normalized($0.text).isEmpty }
+            .filter { mic in
+                let micText = normalized(mic.text)
+                return !remoteSegments.contains { other in
+                    let overlaps = mic.start < other.end && other.start < mic.end
+                    let otherText = normalized(other.text)
+                    return overlaps && (otherText.contains(micText) || micText.contains(otherText))
+                }
+            }
+            .map { var s = $0; s.speakerId = localSpeaker; return s }
+        return (localSegments + remoteSegments).sorted { $0.start < $1.start }
+    }
+
     /// Assigns each word to the speaker turn it overlaps most.
     ///
     /// Words that overlap no turn are attributed to `fallbackSpeakerId` (or the
