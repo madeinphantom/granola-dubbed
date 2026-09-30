@@ -300,3 +300,21 @@ learning this.
 Also: read the failing log before theorising. The first hang I blamed on these
 tests and was wrong (it was the app host); the second genuinely was them, and
 the log said so in both cases.
+
+## 2026-09-30 — Why Atrium kept "failing" release after release
+
+**Root cause, two parts.**
+
+1. **Ad-hoc signing revoked permissions on every update.** TCC keys
+   Microphone/Screen Recording grants on the code signature's designated
+   requirement. Ad-hoc signatures embed a per-build CDHash, so each new release
+   was a new app to macOS. Screen Recording silently lapsed, the process tap
+   delivered silence, and the user saw "failed" again. Fixed by signing
+   releases with a fixed self-signed identity (secret `ATRIUM_SIGNING_P12`),
+   which keeps the designated requirement stable. No Apple account needed.
+
+2. **No release was ever tested with a real recording.** Every bug was found by
+   the user after shipping. Fixed with `--selftest`: the installed app records
+   while `say` speaks a known phrase, transcribes, checks both tracks and the
+   transcript, writes a JSON report, deletes the recording, and quits.
+   **Run it before calling any release done:** `atrium selftest`.

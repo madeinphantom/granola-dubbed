@@ -43,6 +43,7 @@
 		EFD196975D3D7DFB8D0D08AB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D1FD8683C875BC80AC0364 /* ContentView.swift */; };
 		F2AF028F784F6E14AA03E7B8 /* TranscriptAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDE4BABAE0D1F9BFFA310AA /* TranscriptAligner.swift */; };
 		F6E9AEAC9C4DC94A10F3370B /* AudioStoreDeletePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */; };
+		F8E2EC37F7F02116CDEF8FFC /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4058C8598A2AB966495619 /* SelfTest.swift */; };
 		F8F9EF320DEF41FF13E3B65D /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5EB26B49BC38FEC2338B56F3 /* Sparkle */; };
 /* End PBXBuildFile section */
 
@@ -82,6 +83,7 @@
 		80350BDC19EC8D87E72747E9 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		95003C6EC1997FE6A7F5115B /* MicCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicCapture.swift; sourceTree = "<group>"; };
 		9C62E8E33C5CA8CCB4C80E54 /* AudioStoreDeletePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioStoreDeletePathTests.swift; sourceTree = "<group>"; };
+		AC4058C8598A2AB966495619 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		B245C19980FB6ED33DBF315F /* SortformerDiarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortformerDiarizer.swift; sourceTree = "<group>"; };
 		B45DC45EB47E7F9E710810A8 /* ExportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportServiceTests.swift; sourceTree = "<group>"; };
 		B6EF119FF069B52545B0445F /* AtriumTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AtriumTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -125,6 +127,7 @@
 				DCD8BA48FCD7AF1A5AA4A12D /* ExportService.swift */,
 				E35A384F6A9A5AC4FABA89C2 /* PermissionService.swift */,
 				6298A413D72C0FE87EAC2A87 /* Preferences.swift */,
+				AC4058C8598A2AB966495619 /* SelfTest.swift */,
 				FCC56F253DD12443ED83CABC /* SessionController.swift */,
 				C5B883129BC8E94E1EAE003B /* UpdaterService.swift */,
 			);
@@ -367,6 +370,7 @@
 				36976187709AD5E90BDCF3E5 /* Preferences.swift in Sources */,
 				4682D698E7465D91995563B5 /* RecPillView.swift in Sources */,
 				BFB76B567929F547DDEC345B /* SCKFallbackCapture.swift in Sources */,
+				F8E2EC37F7F02116CDEF8FFC /* SelfTest.swift in Sources */,
 				EB20A0C58535E9A921579B02 /* SessionController.swift in Sources */,
 				5D54E07301823A180453CD28 /* SessionWriter.swift in Sources */,
 				DDD04F206F77EB9D9F06F17B /* SettingsView.swift in Sources */,
@@ -427,7 +431,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -435,7 +439,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.3.5;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -449,7 +453,7 @@
 				CODE_SIGN_ENTITLEMENTS = Atrium/Atrium.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Atrium/Info.plist;
@@ -457,7 +461,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.3.5;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.atrium.mac;
 				SDKROOT = macosx;
 				SWIFT_STRICT_CONCURRENCY = complete;

@@ -275,6 +275,9 @@ struct MainAppView: View {
         .onAppear {
             guard !AtriumApp.isRunningTests else { return }
             appState.sessionController.recoverIncompleteSessions()
+            if let reportURL = SelfTest.requestedReportURL {
+                Task { await SelfTest.run(controller: appState.sessionController, reportURL: reportURL) }
+            }
             if selectedMeetingID == nil { selectedMeetingID = meetings.first?.id }
         }
         .onChange(of: appState.sessionController.activeMeeting?.id) { _, newID in

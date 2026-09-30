@@ -148,13 +148,19 @@ final class SessionController: ObservableObject {
     }
     
     func stopRecording() {
+        Task { await stopRecordingAndTranscribe() }
+    }
+
+    /// Stops capture, finalizes the files, and runs transcription, returning
+    /// only once the meeting has reached `.ready` or `.failed`.
+    func stopRecordingAndTranscribe() async {
         guard !isFinalizing, let session = activeSession, let meeting = activeMeeting else { return }
         
         RecPillWindowManager.shared.hide()
         self.isRecording = false
         self.isFinalizing = true
         
-        Task {
+        do {
             meeting.duration = Date().timeIntervalSince(meeting.createdAt)
             do {
                 try await session.stop()

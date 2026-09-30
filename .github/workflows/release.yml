@@ -68,11 +68,33 @@ jobs:
       # Hardened runtime is deliberately NOT enabled: it exists to satisfy
       # notarization, and combined with an ad-hoc signature it only adds
       # restrictions that can prevent the app from launching.
-      - name: Ad-hoc sign with entitlements
+      # Sign with a stable self-signed identity. macOS keys Microphone and
+      # Screen Recording grants on the app's designated requirement; an ad-hoc
+      # signature changes that on every build, so each update silently revoked
+      # permissions and system audio recorded as silence. A fixed certificate
+      # keeps the requirement identical across releases.
+      - name: Sign with stable identity
+        env:
+          P12: ${{ secrets.ATRIUM_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.ATRIUM_SIGNING_PASSWORD }}
         run: |
-          codesign --force --deep --sign - \
+          if [ -z "$P12" ]; then
+            echo "error: ATRIUM_SIGNING_P12 secret missing" >&2; exit 1
+          fi
+          KC="$RUNNER_TEMP/atrium.keychain-db"
+          security create-keychain -p ci "$KC"
+          security set-keychain-settings "$KC"
+          security unlock-keychain -p ci "$KC"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/atrium.p12"
+          security import "$RUNNER_TEMP/atrium.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/atrium.p12"
+          codesign --force --deep --timestamp=none \
+            --sign "Atrium Self-Signed Code Signing" --keychain "$KC" \
             --entitlements Atrium/Atrium.entitlements \
             "${{ steps.app.outputs.path }}"
+          codesign -d -r- "${{ steps.app.outputs.path }}"
           codesign --verify --verbose=2 "${{ steps.app.outputs.path }}"
           # Fail loudly rather than shipping a build that cannot record.
           codesign -d --entitlements :- "${{ steps.app.outputs.path }}" > ents.plist 2>/dev/null
