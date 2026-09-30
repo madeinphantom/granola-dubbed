@@ -11,13 +11,22 @@ import Foundation
 struct ToneAnalysis: Codable, Equatable {
     /// Strongest frequency in the window, in Hz.
     var frequency: Double
-    /// Power of that sinusoid against everything else in the window, in dB.
+    /// Power of that sinusoid against everything else above 300 Hz, in dB.
     var snrDB: Double
+    /// Peak amplitude of that sinusoid (full scale is 1).
+    var amplitude: Double
 
     /// Analyses one window of mono samples, searching 20 Hz to 12 kHz.
+    ///
+    /// Content below ~300 Hz is filtered out first. The self-test runs on a
+    /// real Mac where other apps may be playing (music, a video): that audio
+    /// is legitimately in them.caf and mostly bass, while the damage a broken
+    /// capture does to a 1 kHz tone (images, clicks, garble) lands higher.
     static func analyse(_ samples: ArraySlice<Float>, sampleRate: Double) -> ToneAnalysis? {
-        let window = samples.map(Double.init)
-        guard window.count >= 256, sampleRate > 0 else { return nil }
+        guard samples.count >= 512, sampleRate > 0 else { return nil }
+        let settle = Int(sampleRate * 0.005)
+        let window = Array(highPass(samples.map(Double.init), cutoff: 300, sampleRate: sampleRate)
+            .dropFirst(min(settle, samples.count / 4)))
         let totalPower = window.reduce(0) { $0 + $1 * $1 } / Double(window.count)
         guard totalPower > 0 else { return nil }
 
@@ -43,7 +52,27 @@ struct ToneAnalysis: Codable, Equatable {
             g += 0.25
         }
         let residual = max(totalPower - bestPower, totalPower * 1e-12)
-        return ToneAnalysis(frequency: best, snrDB: 10 * log10(bestPower / residual))
+        return ToneAnalysis(frequency: best,
+                            snrDB: 10 * log10(bestPower / residual),
+                            amplitude: (2 * bestPower).squareRoot())
+    }
+
+    /// Two cascaded one-pole high-pass filters.
+    static func highPass(_ x: [Double], cutoff: Double, sampleRate: Double) -> [Double] {
+        let rc = 1 / (2 * Double.pi * cutoff)
+        let alpha = rc / (rc + 1 / sampleRate)
+        var y = x
+        for _ in 0..<2 {
+            var previousIn = y.first ?? 0
+            var previousOut = 0.0
+            for i in y.indices {
+                let input = y[i]
+                previousOut = alpha * (previousOut + input - previousIn)
+                previousIn = input
+                y[i] = previousOut
+            }
+        }
+        return y
     }
 
     /// Mean power of the component of `window` at `frequency` (least-squares
@@ -90,7 +119,7 @@ struct ToneAnalysis: Codable, Equatable {
 
     /// Writes a pure sine tone as a 44.1 kHz WAV, so playback also exercises
     /// a rate different from the capture format.
-    static func writeTone(frequency: Double, seconds: Double, to url: URL) throws {
+    static func writeTone(frequency: Double, seconds: Double, amplitude: Float, to url: URL) throws {
         let rate = 44_100.0
         guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
               let buffer = AVAudioPCMBuffer(pcmFormat: format,
@@ -103,7 +132,7 @@ struct ToneAnalysis: Codable, Equatable {
         let count = Int(buffer.frameLength)
         for i in 0..<count {
             let envelope = Float(min(1, Double(min(i, count - 1 - i)) / Double(fade)))
-            data[i] = 0.3 * envelope * Float(sin(2 * Double.pi * frequency * Double(i) / rate))
+            data[i] = amplitude * envelope * Float(sin(2 * Double.pi * frequency * Double(i) / rate))
         }
         let settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,

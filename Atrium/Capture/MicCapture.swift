@@ -16,6 +16,13 @@ final class MicCapture {
         // was lost — a 6 minute recording produced a 1 minute you.caf.
         do {
             try input.setVoiceProcessingEnabled(true)
+            // Voice processing ducks all other audio by default, so starting
+            // a recording turned the meeting (and anything else playing) down
+            // in the user's ears and in them.caf alike. Duck as little as the
+            // API allows.
+            input.voiceProcessingOtherAudioDuckingConfiguration =
+                AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false,
+                                                                     duckingLevel: .min)
         } catch {
             // Not fatal: without AEC the mic may pick up speaker bleed, but a
             // recording with echo beats no recording at all.

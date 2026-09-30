@@ -17,6 +17,10 @@ enum SelfTest {
     static let phrase = "Atrium self test. The quick brown fox jumps over the lazy dog."
     static let toneHz = 1000.0
     static let toneSeconds = 3.0
+    /// Loud, so it stands well above anything else playing on the Mac.
+    static let toneAmplitude = 0.8
+    /// Broken capture (wrong layout, dropped buffers) scores near 0 dB.
+    static let minimumToneSNR = 15.0
     private static let logger = Logger(subsystem: "app.atrium.app", category: "SelfTest")
 
     /// Report path when launched with `--selftest <path>`.
@@ -91,7 +95,8 @@ enum SelfTest {
             .appendingPathComponent("atrium-selftest-tone.wav")
         var toneOffset: Double?
         do {
-            try ToneAnalysis.writeTone(frequency: toneHz, seconds: toneSeconds, to: toneURL)
+            try ToneAnalysis.writeTone(frequency: toneHz, seconds: toneSeconds,
+                                       amplitude: Float(toneAmplitude), to: toneURL)
             toneOffset = Date().timeIntervalSince(recordingStarted)
             await run("/usr/bin/afplay", [toneURL.path])
         } catch {
@@ -122,14 +127,14 @@ enum SelfTest {
                 }
                 let analysis = ToneAnalysis.analyse(track.samples[start..<(start + window)],
                                                     sampleRate: track.sampleRate)
-                    ?? ToneAnalysis(frequency: 0, snrDB: -999)
+                    ?? ToneAnalysis(frequency: 0, snrDB: -999, amplitude: 0)
                 toneWindows.append(analysis)
             }
             if toneWindows.contains(where: { abs($0.frequency - toneHz) > 5 }) {
                 failures.append("Test tone came back at the wrong frequency (expected \(Int(toneHz)) Hz)")
             }
-            if toneWindows.contains(where: { $0.snrDB < 20 }) {
-                failures.append("Test tone is not clean in them.caf (SNR below 20 dB): system audio has noise or static")
+            if toneWindows.contains(where: { $0.snrDB < minimumToneSNR }) {
+                failures.append("Test tone is not clean in them.caf (SNR below \(Int(minimumToneSNR)) dB): system audio has noise or static, or other audio was playing loudly")
             }
         } else if toneOffset != nil {
             failures.append("Could not read them.caf to check the test tone")
