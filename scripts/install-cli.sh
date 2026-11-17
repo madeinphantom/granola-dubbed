@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="$REPO/scripts/atrium-update"
+SRC="$REPO/scripts/atrium"
 
 # Prefer a location that needs no sudo. Homebrew's bin is already on PATH for
 # most setups; ~/.local/bin is the fallback.
@@ -25,5 +25,5 @@ if ! command -v atrium >/dev/null 2>&1; then
   echo "    echo 'export PATH=\"$(dirname "$DEST"):\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
 else
   echo
-  echo "Try:  atrium status"
+  echo "Try:  atrium install"
 fi

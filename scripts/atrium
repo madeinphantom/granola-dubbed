@@ -1,0 +1,127 @@
+#!/bin/bash
+# Build, test, install and check Atrium. Needs only the Xcode Command Line
+# Tools (xcode-select --install); full Xcode also works.
+#
+#   scripts/atrium build      build dist/Atrium.app
+#   scripts/atrium install    build, then copy to /Applications
+#   scripts/atrium test       run the unit tests
+#   scripts/atrium selftest   record a spoken phrase with the installed app
+#                             and check the whole pipeline (uses your speakers)
+#   scripts/atrium update     git pull, then install
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
+APP_NAME="Atrium"
+DIST="$ROOT/dist"
+BUNDLE="$DIST/$APP_NAME.app"
+INSTALLED="/Applications/$APP_NAME.app"
+VERSION="${ATRIUM_VERSION:-$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 0.0.0)}"
+BUILD_NUMBER="${ATRIUM_BUILD:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
+# A fixed signing identity keeps macOS permissions across rebuilds. Without
+# one the app is signed ad hoc, and macOS asks for permissions again after
+# every build. See README > "Keep permissions across updates".
+IDENTITY="${ATRIUM_SIGNING_IDENTITY:-Atrium Self-Signed Code Signing}"
+
+say() { printf "\033[36m==> %s\033[0m\n" "$1"; }
+fail() { printf "\033[31m%s\033[0m\n" "$1" >&2; exit 1; }
+
+# Command Line Tools ship Swift Testing but SwiftPM does not find it there.
+testing_flags() {
+  local dev; dev="$(xcode-select -p)"
+  if [[ "$dev" == *CommandLineTools* ]]; then
+    local frameworks="$dev/Library/Developer/Frameworks" lib="$dev/Library/Developer/usr/lib"
+    echo "-Xswiftc -F -Xswiftc $frameworks -Xlinker -F -Xlinker $frameworks \
+      -Xlinker -rpath -Xlinker $frameworks -Xlinker -rpath -Xlinker $lib"
+  fi
+}
+
+cmd_build() {
+  cd "$ROOT"
+  say "Building $APP_NAME $VERSION ($BUILD_NUMBER)"
+  swift build -c release --arch arm64 --product "$APP_NAME"
+  local bin; bin="$(swift build -c release --arch arm64 --show-bin-path)"
+
+  rm -rf "$BUNDLE"
+  mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
+  cp "$bin/$APP_NAME" "$BUNDLE/Contents/MacOS/$APP_NAME"
+  sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD_NUMBER/" \
+    Resources/Info.plist > "$BUNDLE/Contents/Info.plist"
+  cp Resources/AppIcon.icns "$BUNDLE/Contents/Resources/"
+  # SwiftPM resource bundles (tokenizer fallbacks from swift-transformers).
+  for resources in "$bin"/*.bundle; do
+    [ -e "$resources" ] && cp -R "$resources" "$BUNDLE/Contents/Resources/"
+  done
+
+  # Not -v: a self-signed certificate is never "trusted", and it does not need
+  # to be. The signature's designated requirement pins the certificate's hash.
+  if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
+    say "Signing with \"$IDENTITY\""
+    codesign --force --deep --options runtime --timestamp=none \
+      --entitlements Resources/Atrium.entitlements --sign "$IDENTITY" "$BUNDLE"
+  else
+    say "Signing ad hoc (no \"$IDENTITY\" identity; permissions reset each build)"
+    codesign --force --deep --entitlements Resources/Atrium.entitlements --sign - "$BUNDLE"
+  fi
+  codesign --verify --strict "$BUNDLE"
+  # Recording needs this; fail rather than ship an app that cannot use the mic.
+  codesign -d --entitlements - "$BUNDLE" 2>/dev/null | grep -q "audio-input" \
+    || fail "Signed app is missing the audio-input entitlement"
+  echo "Built $BUNDLE"
+}
+
+cmd_install() {
+  cmd_build
+  if pgrep -xq "$APP_NAME"; then
+    say "Quitting running $APP_NAME"
+    osascript -e "quit app \"$APP_NAME\"" >/dev/null 2>&1 || true
+    sleep 2
+  fi
+  say "Installing to $INSTALLED"
+  rm -rf "$INSTALLED"
+  cp -R "$BUNDLE" "$INSTALLED"
+  open "$INSTALLED"
+  echo "Atrium is in your menu bar. Press ⌃⌥⌘R to start or stop recording."
+}
+
+cmd_test() {
+  cd "$ROOT"
+  # shellcheck disable=SC2046
+  swift test $(testing_flags)
+}
+
+cmd_selftest() {
+  [ -d "$INSTALLED" ] || fail "Atrium is not installed. Run: scripts/atrium install"
+  local dir report
+  dir="$(mktemp -d)"
+  report="$dir/report.json"
+  if pgrep -xq "$APP_NAME"; then
+    osascript -e "quit app \"$APP_NAME\"" >/dev/null 2>&1 || true
+    sleep 2
+  fi
+  say "Self-test: plays a phrase and a tone through your speakers (the first run downloads the speech model)"
+  open -n -a "$INSTALLED" --args --selftest "$report"
+  local waited=0
+  while [ ! -f "$report" ] && [ $waited -lt 1200 ]; do sleep 3; waited=$((waited + 3)); done
+  [ -f "$report" ] || fail "No report after ${waited}s"
+  cat "$report"
+  open -a "$INSTALLED"
+  if grep -q '"passed" : true' "$report"; then
+    printf "\033[32mSELF-TEST PASSED\033[0m\n"
+  else
+    fail "SELF-TEST FAILED (evidence in $dir)"
+  fi
+}
+
+cmd_update() {
+  git -C "$ROOT" pull --ff-only
+  cmd_install
+}
+
+case "${1:-}" in
+  build) cmd_build ;;
+  install) cmd_install ;;
+  test) cmd_test ;;
+  selftest) cmd_selftest ;;
+  update) cmd_update ;;
+  *) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

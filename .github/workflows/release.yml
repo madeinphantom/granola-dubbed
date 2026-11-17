@@ -6,74 +6,35 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (e.g. v0.1.0)"
+        description: "Tag to publish (e.g. v0.5.0)"
         required: true
-        default: "v0.1.0"
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build unsigned DMG
+    name: Build DMG
     runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Generate project
-        run: xcodegen generate
+      - name: Resolve tag
+        id: tag
+        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Test
         timeout-minutes: 10
-        env:
-          CI: "true"
-        run: |
-          xcodebuild test \
-            -scheme Atrium \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO
+        run: scripts/atrium test
 
-      # No Developer ID certificate is available, so the app is signed ad-hoc
-      # ("-"). It runs, but Gatekeeper will quarantine it on download; the
-      # release notes tell users how to open it.
-      - name: Build Release app (ad-hoc signed)
-        run: |
-          xcodebuild build \
-            -scheme Atrium \
-            -configuration Release \
-            -destination 'platform=macOS' \
-            -derivedDataPath build/dd \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_HARDENED_RUNTIME=NO
-
-      - name: Locate app
-        id: app
-        run: |
-          APP=$(find build/dd/Build/Products/Release -maxdepth 1 -name "Atrium.app" | head -1)
-          if [ -z "$APP" ]; then echo "Atrium.app not found" >&2; exit 1; fi
-          echo "path=$APP" >> "$GITHUB_OUTPUT"
-          echo "Found: $APP"
-
-      # Sign ad-hoc so the entitlements are attached — without this the
-      # microphone entitlement is missing and recording fails at runtime.
-      # Hardened runtime is deliberately NOT enabled: it exists to satisfy
-      # notarization, and combined with an ad-hoc signature it only adds
-      # restrictions that can prevent the app from launching.
-      # Sign with a stable self-signed identity. macOS keys Microphone and
-      # Screen Recording grants on the app's designated requirement; an ad-hoc
-      # signature changes that on every build, so each update silently revoked
-      # permissions and system audio recorded as silence. A fixed certificate
-      # keeps the requirement identical across releases.
-      - name: Sign with stable identity
+      # macOS keys Microphone and Screen & System Audio Recording grants on the
+      # app's designated requirement. An ad-hoc signature changes it on every
+      # build, so each update would silently revoke system audio. A fixed
+      # self-signed certificate keeps the requirement identical across releases.
+      - name: Import signing identity
         env:
           P12: ${{ secrets.ATRIUM_SIGNING_P12 }}
           P12_PASSWORD: ${{ secrets.ATRIUM_SIGNING_PASSWORD }}
@@ -90,110 +51,55 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k ci "$KC" >/dev/null
           security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/atrium.p12"
-          codesign --force --deep --timestamp=none \
-            --sign "Atrium Self-Signed Code Signing" --keychain "$KC" \
-            --entitlements Atrium/Atrium.entitlements \
-            "${{ steps.app.outputs.path }}"
-          codesign -d -r- "${{ steps.app.outputs.path }}"
-          codesign --verify --verbose=2 "${{ steps.app.outputs.path }}"
-          # Fail loudly rather than shipping a build that cannot record.
-          codesign -d --entitlements :- "${{ steps.app.outputs.path }}" > ents.plist 2>/dev/null
-          cat ents.plist
-          grep -q "com.apple.security.device.audio-input" ents.plist \
-            || { echo "error: audio-input entitlement missing from signed app" >&2; exit 1; }
+
+      - name: Build app
+        env:
+          ATRIUM_VERSION: ${{ steps.tag.outputs.value }}
+        run: |
+          ATRIUM_VERSION="${ATRIUM_VERSION#v}" scripts/atrium build
+          # The build signs ad hoc when the identity is missing; a release must not.
+          codesign -d -r- dist/Atrium.app 2>&1 | tee requirement.txt
+          grep -q "certificate leaf" requirement.txt \
+            || { echo "error: release is not signed with the stable identity" >&2; exit 1; }
 
       - name: Build DMG
         run: |
           mkdir -p dist/dmg
-          cp -R "${{ steps.app.outputs.path }}" dist/dmg/
+          cp -R dist/Atrium.app dist/dmg/
           ln -s /Applications dist/dmg/Applications
-          hdiutil create -volname "Atrium" -srcfolder dist/dmg \
-            -ov -format UDZO dist/Atrium.dmg
-          ls -la dist/
-
-      # Sparkle appcast. Signing needs the EdDSA private key; without the
-      # secret the DMG still ships, just with no auto-update feed.
-      - name: Generate signed appcast
-        env:
-          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: |
-          if [ -z "$SPARKLE_KEY" ]; then
-            echo "SPARKLE_PRIVATE_KEY secret not set — publishing DMG without an" \
-                 "appcast. In-app updates stay disabled until it is added."
-            exit 0
-          fi
-          SPARKLE_BIN=$(find ~/Library/Developer/Xcode/DerivedData \
-            -path "*/artifacts/sparkle/Sparkle/bin" -type d 2>/dev/null | head -1)
-          if [ -z "$SPARKLE_BIN" ]; then
-            echo "error: Sparkle tools not found in DerivedData" >&2
-            exit 1
-          fi
-          echo "$SPARKLE_KEY" > /tmp/sparkle_priv.key
-          "$SPARKLE_BIN/generate_appcast" \
-            --ed-key-file /tmp/sparkle_priv.key \
-            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.event.inputs.tag || github.ref_name }}/" \
-            dist/
-          rm -f /tmp/sparkle_priv.key
-          ls -la dist/
-
-      - name: Resolve tag
-        id: tag
-        run: echo "value=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+          hdiutil create -volname "Atrium" -srcfolder dist/dmg -ov -format UDZO dist/Atrium.dmg
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cat > notes.md <<'NOTES'
-          Local-first meeting recorder for macOS. Requires macOS 15+ on Apple Silicon.
+          Local-first call recorder for macOS. Requires macOS 15+ on Apple Silicon.
 
           ## Install
 
-          1. Download `Atrium.dmg` below, open it, drag **Atrium** to Applications.
-          2. This build is **not notarized** (no Apple Developer certificate), so
-             macOS will block it on first launch. To open it:
+          1. Download `Atrium.dmg`, open it, drag **Atrium** to Applications.
+          2. This build is not notarized, so clear the download quarantine:
 
-          ```bash
-          xattr -dr com.apple.quarantine /Applications/Atrium.app
-          ```
+             ```bash
+             xattr -dr com.apple.quarantine /Applications/Atrium.app
+             ```
 
-             Then right-click the app → **Open** → **Open**.
+          3. Open Atrium. Allow **Microphone**, then turn Atrium on in System
+             Settings › Privacy & Security › **Screen & System Audio Recording**
+             and reopen it.
 
-          3. Grant **Microphone** and **Screen Recording** when prompted
-             (System Settings → Privacy & Security). Screen Recording is needed
-             for system-audio capture.
+          Press ⌃⌥⌘R to start and stop recording. The Whisper model (about 1 GB)
+          downloads on first use.
 
-          ## Testing it
+          ## Known limits
 
-          Press ⌘R or use the menu bar waveform icon to record. After stopping,
-          transcription runs locally — the Whisper model (~950MB) downloads on
-          first use, so the first transcript takes a while.
-
-          Sessions are written to:
-          `~/Library/Application Support/Atrium/Sessions/<uuid>/`
-
-          Each contains `tracks/you.caf`, `tracks/them.caf`, `session.m4a`, and
-          `transcript.json`.
-
-          ## Known limitations
-
-          - Not notarized; see the quarantine step above.
-          - Multiple remote speakers are attributed as a single "Them" —
-            neural diarization is not implemented yet.
-          - Speaker attribution uses a fixed energy threshold that has not been
-            tuned against real calls.
+          - Everyone on the far side of the call is one speaker, "Them".
           NOTES
 
           TAG="${{ steps.tag.outputs.value }}"
-          # `--clobber` is an upload flag, not a create flag: create the release
-          # if it does not exist yet, otherwise replace the existing asset.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/Atrium.dmg --clobber
-            [ -f dist/appcast.xml ] && gh release upload "$TAG" dist/appcast.xml --clobber || true
           else
-            ASSETS=(dist/Atrium.dmg)
-            [ -f dist/appcast.xml ] && ASSETS+=(dist/appcast.xml)
-            gh release create "$TAG" "${ASSETS[@]}" \
-              --title "Atrium $TAG" \
-              --notes-file notes.md
+            gh release create "$TAG" dist/Atrium.dmg --title "Atrium $TAG" --notes-file notes.md
           fi

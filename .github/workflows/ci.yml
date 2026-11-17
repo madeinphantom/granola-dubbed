@@ -13,37 +13,18 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        with:
+          fetch-depth: 0
 
       - name: Show versions
-        run: |
-          xcodebuild -version
-          swift --version
+        run: swift --version
 
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Generate project
-        run: xcodegen generate
-
-      - name: Build
-        run: |
-          xcodebuild build \
-            -scheme Atrium \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO
-
-      # The unit tests are pure logic; hosting them in the app would launch
-      # SwiftUI and Sparkle's updater on a headless runner, which hangs.
+      # The unit tests are pure logic; nothing touches audio hardware.
       - name: Test
         timeout-minutes: 10
-        env:
-          CI: "true"
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -scheme Atrium \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO
+        run: scripts/atrium test
+
+      # Signs ad hoc on the runner and fails if the audio-input entitlement is
+      # missing from the signed app.
+      - name: Build app
+        run: scripts/atrium build
