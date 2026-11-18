@@ -13,30 +13,40 @@ public final class CallProcessor: @unchecked Sendable {
 
     public init() {}
 
-    /// Transcribes the call in `folder`, writes `transcript.md`, then replaces
-    /// the raw tracks with `call.mp4`. `progress` runs from 0 to 1.
+    /// Transcribes the call in `folder`, writes its transcript, replaces the
+    /// raw tracks with one mixed `.mp4`, then names the call after what was
+    /// said. Returns the call's folder, which the naming may have moved.
+    /// `progress` runs from 0 to 1.
     @discardableResult
     public func process(_ folder: URL, model: String = SpeechRecognizer.configuredModel,
-                        progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> Transcript {
+                        progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
         let errorURL = folder.appendingPathComponent(SessionFiles.error)
         do {
-            let transcript = try await transcribe(folder, model: model, progress: progress)
+            let title = try await transcribe(folder, model: model, progress: progress)
             try? FileManager.default.removeItem(at: errorURL)
             do {
                 try await compress(folder)
             } catch {
                 // The transcript is safe; the raw tracks stay until this works.
                 logger.error("Compressing audio failed: \(error.localizedDescription)")
+                return folder
             }
-            return transcript
+            guard let title else { return folder }
+            do {
+                return try SessionStore.rename(folder, to: title)
+            } catch {
+                logger.error("Naming the call failed: \(error.localizedDescription)")
+                return folder
+            }
         } catch {
             try? error.localizedDescription.write(to: errorURL, atomically: true, encoding: .utf8)
             throw error
         }
     }
 
+    /// Writes the transcript and returns the call's title, if it got one.
     private func transcribe(_ folder: URL, model: String,
-                            progress: @escaping @Sendable (Double) -> Void) async throws -> Transcript {
+                            progress: @escaping @Sendable (Double) -> Void) async throws -> String? {
         let tracks: [(Speaker, URL)] = [(.me, track(.me, in: folder)), (.them, track(.them, in: folder))]
             .compactMap { speaker, url in url.map { (speaker, $0) } }
         guard !tracks.isEmpty else { throw CocoaError(.fileNoSuchFile) }
@@ -77,21 +87,22 @@ public final class CallProcessor: @unchecked Sendable {
             warnings: warnings.sorted(),
             utterances: TranscriptMerger.merge(me: results[.me] ?? [], them: results[.them] ?? []))
 
-        let markdown = TranscriptRenderer.markdown(transcript, title: Self.title(for: transcript.recordedAt))
-        try markdown.write(to: folder.appendingPathComponent(SessionFiles.transcriptMarkdown),
+        let title = await CallTitler.title(for: transcript)
+        let markdown = TranscriptRenderer.markdown(transcript, title: title ?? "Call")
+        try markdown.write(to: SessionFiles.transcript(in: folder),
                            atomically: true, encoding: .utf8)
         progress(1)
-        return transcript
+        return title
     }
 
     /// Replaces the raw tracks (about 700 MB per hour each) with one mixed
-    /// `call.mp4`. The raw files are deleted only once it exists and plays.
+    /// `.mp4`. The raw files are deleted only once it exists and plays.
     private func compress(_ folder: URL) async throws {
         let raws = [SessionFiles.meRaw, SessionFiles.themRaw].map { folder.appendingPathComponent($0) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
         let sources = raws.filter { CallRecorder.duration(of: $0) > 0 }
         guard !sources.isEmpty else { return }
-        try await AudioExport.mp4(mixing: sources, to: folder.appendingPathComponent(SessionFiles.audio))
+        try await AudioExport.mp4(mixing: sources, to: SessionFiles.audio(in: folder))
         for raw in raws {
             try FileManager.default.removeItem(at: raw)
         }
@@ -101,12 +112,6 @@ public final class CallProcessor: @unchecked Sendable {
     func track(_ speaker: Speaker, in folder: URL) -> URL? {
         let url = folder.appendingPathComponent(speaker == .me ? SessionFiles.meRaw : SessionFiles.themRaw)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
-    }
-
-    static func title(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE d MMMM yyyy, HH:mm"
-        return "Call — \(formatter.string(from: date))"
     }
 }
 

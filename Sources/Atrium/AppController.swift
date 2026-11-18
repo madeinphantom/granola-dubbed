@@ -21,6 +21,8 @@ final class AppController {
     private(set) var queued: [URL] = []
     /// Stats of the last stopped recording, for the self-test.
     private(set) var lastStats: RecordingStats?
+    /// Where calls went when they were named after transcription.
+    private var renamed: [URL: URL] = [:]
 
     var onChange: () -> Void = {}
 
@@ -90,6 +92,11 @@ final class AppController {
         if transcribing == nil { Task { await drainQueue() } }
     }
 
+    /// The folder a call is in now; naming it moves it.
+    func currentFolder(of folder: URL) -> URL {
+        renamed[SessionStore.canonical(folder)] ?? folder
+    }
+
     /// Resolves once `folder` has been transcribed or has failed.
     func waitUntilProcessed(_ folder: URL) async {
         while transcribing == folder || queued.contains(folder) {
@@ -104,12 +111,13 @@ final class AppController {
             transcriptionProgress = 0
             onChange()
             do {
-                try await processor.process(folder) { fraction in
+                let named = try await processor.process(folder) { fraction in
                     Task { @MainActor in
                         self.transcriptionProgress = fraction
                         self.onChange()
                     }
                 }
+                if named != folder { renamed[folder] = named }
             } catch {
                 // The error is also written into the call's folder and shown
                 // in the menu, where the call can be retried.

@@ -108,7 +108,9 @@ public enum TranscriptMerger {
 public enum TranscriptRenderer {
     public static func markdown(_ transcript: Transcript, title: String) -> String {
         var lines = ["# \(title)", ""]
-        var meta = ["Duration \(timestamp(transcript.durationSeconds))"]
+        let date = DateFormatter()
+        date.dateFormat = "EEEE d MMMM yyyy, HH:mm"
+        var meta = [date.string(from: transcript.recordedAt), "Duration \(timestamp(transcript.durationSeconds))"]
         meta.append("Transcribed locally with \(transcript.model)")
         lines.append(meta.joined(separator: " · "))
         lines.append("")

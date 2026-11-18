@@ -13,12 +13,18 @@ Atrium lives in the menu bar. Press **⌃⌥⌘R** (or use the menu) to start an
 stop recording. Transcription runs when you stop; the Whisper model
 (`openai_whisper-large-v3_turbo`, about 1 GB) downloads on first use.
 
-Each call gets its own folder, listed in the menu, holding two files:
+Each call gets its own folder, named after what was said, holding two files
+with the same name:
 
-| File | What |
-|---|---|
-| `call.mp4` | Both sides of the call, mixed (about 30 MB per hour) |
-| `transcript.md` | The transcript, speaker by speaker |
+```
+~/Documents/Atrium/Pricing review/
+├── Pricing review.mp4    both sides of the call, mixed (about 30 MB per hour)
+└── Pricing review.md     the transcript, speaker by speaker
+```
+
+Apple's on-device model writes the title once the call is transcribed;
+nothing leaves the Mac. Without it (macOS 15, or Apple Intelligence off) a
+call keeps its date name, `Call 2026-11-17 at 16.01.18`.
 
 While a call is recorded and transcribed the folder holds the raw tracks
 (`me.caf`, `them.caf`). If transcription fails they stay, with
@@ -106,7 +112,9 @@ Sources/
    speaker comes from the track. Echo of the other side picked up by the mic
    is dropped. Calls left untranscribed when Atrium quit are resumed at launch.
 3. **Compress.** Once the transcript is written, both raw tracks are mixed
-   into one 64 kbps AAC `call.mp4` and deleted.
+   into one 64 kbps AAC `.mp4` and deleted.
+4. **Name.** `CallTitler` asks the on-device model what the call was about,
+   and the folder and both files are renamed to that title.
 
 The app runs with the hardened runtime and is not sandboxed: CoreAudio process
 taps are unavailable inside the App Sandbox.

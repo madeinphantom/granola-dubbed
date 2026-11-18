@@ -134,7 +134,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func openTranscript(_ sender: NSMenuItem) {
         guard let folder = sender.representedObject as? URL else { return }
-        NSWorkspace.shared.open(folder.appendingPathComponent(SessionFiles.transcriptMarkdown))
+        NSWorkspace.shared.open(SessionFiles.transcript(in: folder))
     }
 
     @objc private func transcribe(_ sender: NSMenuItem) {
@@ -171,14 +171,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             : String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    /// "Today 15:17", "Yesterday 09:02", "Tue 28 Oct 11:30".
+    /// "Pricing review · Today 15:17"; "Yesterday 09:02" before a call is named.
     static func name(of folder: URL) -> String {
         guard let session = SessionStore.session(at: folder) else { return folder.lastPathComponent }
         let date = session.createdAt
         let time = date.formatted(date: .omitted, time: .shortened)
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "Today \(time)" }
-        if calendar.isDateInYesterday(date) { return "Yesterday \(time)" }
-        return date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+        let when = calendar.isDateInToday(date) ? "Today \(time)"
+            : calendar.isDateInYesterday(date) ? "Yesterday \(time)"
+            : date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+        return session.title.map { "\($0) · \(when)" } ?? when
     }
 }

@@ -42,7 +42,7 @@ enum SelfTest {
         var failures: [String] = []
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("atrium-selftest-\(UUID().uuidString)")
 
-        guard let folder = await controller.start(in: root, showingErrors: false) else {
+        guard let recorded = await controller.start(in: root, showingErrors: false) else {
             finish(Report(version: version, passed: false,
                           failures: ["Recording did not start. Check Microphone and Screen & System Audio Recording permissions."],
                           toneWindows: [], transcriptMarkdown: ""), reportURL: reportURL, evidence: nil)
@@ -67,7 +67,8 @@ enum SelfTest {
 
         controller.stop()
         try? FileManager.default.removeItem(at: toneURL)
-        await controller.waitUntilProcessed(folder)
+        await controller.waitUntilProcessed(recorded)
+        let folder = controller.currentFolder(of: recorded)
 
         let stats = controller.lastStats
         if let stats {
@@ -88,15 +89,15 @@ enum SelfTest {
             failures.append("The recording could not be saved")
         }
 
-        // Analysed in the kept call.mp4, so the file the user gets is what passes.
+        // Analysed in the kept .mp4, so the file the user gets is what passes.
         var toneWindows: [ToneAnalysis] = []
-        let audioURL = folder.appendingPathComponent(SessionFiles.audio)
+        let audioURL = SessionFiles.audio(in: folder)
         if let toneOffset, let track = ToneAnalysis.monoSamples(of: audioURL) {
             let window = Int(track.sampleRate * 0.3)
             for offset in stride(from: toneOffset + 0.6, through: toneOffset + toneSeconds - 0.9, by: 0.4) {
                 let start = Int(offset * track.sampleRate)
                 guard start >= 0, start + window <= track.samples.count else {
-                    failures.append("\(SessionFiles.audio) ends before the test tone")
+                    failures.append("\(SessionFiles.audio(in: folder).lastPathComponent) ends before the test tone")
                     break
                 }
                 toneWindows.append(ToneAnalysis.analyse(track.samples[start..<(start + window)],
@@ -110,10 +111,10 @@ enum SelfTest {
                 failures.append("Test tone is not clean (SNR below \(Int(minimumToneSNR)) dB): noise, static, or loud background audio")
             }
         } else if toneOffset != nil {
-            failures.append("Could not read \(SessionFiles.audio)")
+            failures.append("Could not read \(SessionFiles.audio(in: folder).lastPathComponent)")
         }
 
-        let markdown = (try? String(contentsOf: folder.appendingPathComponent(SessionFiles.transcriptMarkdown),
+        let markdown = (try? String(contentsOf: SessionFiles.transcript(in: folder),
                                     encoding: .utf8)) ?? ""
         if markdown.isEmpty {
             let error = (try? String(contentsOf: folder.appendingPathComponent(SessionFiles.error), encoding: .utf8)) ?? "unknown"
@@ -128,7 +129,8 @@ enum SelfTest {
             }
         }
         let files = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
-        let expected: Set = [SessionFiles.audio, SessionFiles.transcriptMarkdown]
+        let expected: Set = [SessionFiles.audio(in: folder).lastPathComponent,
+                             SessionFiles.transcript(in: folder).lastPathComponent]
         if files != expected {
             failures.append("The call folder holds \(files.sorted()), not just \(expected.sorted())")
         }

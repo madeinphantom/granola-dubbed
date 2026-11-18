@@ -164,6 +164,16 @@ import Testing
     }
 }
 
+@Suite struct CallTitleTests {
+    @Test func modelRepliesBecomeSafeFileNames() {
+        #expect(CallTitler.sanitized("\"Q3 pricing: next steps.\"") == "Q3 pricing next steps")
+        #expect(CallTitler.sanitized("Title: Hiring plan / Berlin\nBecause they discussed…") == "Hiring plan Berlin")
+        #expect(CallTitler.sanitized("  ...  ") == nil)
+        let long = CallTitler.sanitized(String(repeating: "word ", count: 30))!
+        #expect(long.count <= CallTitler.maximumTitleLength && !long.hasSuffix(" "))
+    }
+}
+
 @Suite struct SessionStoreTests {
     private func tempRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("atrium-test-\(UUID().uuidString)")
@@ -178,7 +188,7 @@ import Testing
 
         let done = SessionStore.newSessionFolder(at: date, in: root)
         try FileManager.default.createDirectory(at: done, withIntermediateDirectories: true)
-        try "x".write(to: done.appendingPathComponent(SessionFiles.transcriptMarkdown), atomically: true, encoding: .utf8)
+        try "x".write(to: SessionFiles.transcript(in: done), atomically: true, encoding: .utf8)
 
         let failed = SessionStore.newSessionFolder(at: date, in: root)
         #expect(failed.lastPathComponent.hasSuffix("(2)"), "same-second calls must not collide")
@@ -195,6 +205,29 @@ import Testing
         #expect(sessions.allSatisfy { abs($0.createdAt.timeIntervalSince(date)) < 1 })
         #expect(sessions.contains { $0.folder == done && $0.state == .transcribed })
         #expect(sessions.contains { $0.folder == failed && $0.state == .untranscribed(error: "model download failed") })
+    }
+
+    @Test func aNamedCallIsItsTitleOnTheFolderAndBothFiles() throws {
+        let root = try tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        func call() throws -> URL {
+            let folder = SessionStore.newSessionFolder(in: root)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try "x".write(to: SessionFiles.transcript(in: folder), atomically: true, encoding: .utf8)
+            try Data([1]).write(to: SessionFiles.audio(in: folder))
+            return folder
+        }
+        let named = try SessionStore.rename(try call(), to: "Pricing review")
+        #expect(named.lastPathComponent == "Pricing review")
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: named.path))
+                == ["Pricing review.md", "Pricing review.mp4"])
+        let session = try #require(SessionStore.session(at: named))
+        #expect(session.title == "Pricing review" && session.state == .transcribed)
+        #expect(abs(session.createdAt.timeIntervalSinceNow) < 60, "the date survives the rename")
+
+        let second = try SessionStore.rename(try call(), to: "Pricing review")
+        #expect(second.lastPathComponent == "Pricing review (2)")
+        #expect(SessionStore.session(at: second)?.title == "Pricing review")
     }
 }
 
@@ -220,7 +253,7 @@ import Testing
         let them = folder.appendingPathComponent(SessionFiles.themRaw)
         try writeTrack(me, seconds: 2, amplitude: 0.3)
         try writeTrack(them, seconds: 3, amplitude: 0.3)
-        let audio = folder.appendingPathComponent(SessionFiles.audio)
+        let audio = SessionFiles.audio(in: folder)
         try await AudioExport.mp4(mixing: [me, them], to: audio)
         let duration = try await AVURLAsset(url: audio).load(.duration).seconds
         #expect(abs(duration - 3) < 0.1)
