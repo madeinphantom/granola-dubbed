@@ -13,8 +13,8 @@ public final class CallProcessor: @unchecked Sendable {
 
     public init() {}
 
-    /// Transcribes the call in `folder` and writes `transcript.md` and
-    /// `transcript.json`. `progress` runs from 0 to 1.
+    /// Transcribes the call in `folder`, writes `transcript.md`, then replaces
+    /// the raw tracks with `call.mp4`. `progress` runs from 0 to 1.
     @discardableResult
     public func process(_ folder: URL, model: String = SpeechRecognizer.configuredModel,
                         progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> Transcript {
@@ -77,11 +77,6 @@ public final class CallProcessor: @unchecked Sendable {
             warnings: warnings.sorted(),
             utterances: TranscriptMerger.merge(me: results[.me] ?? [], them: results[.them] ?? []))
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(transcript).write(to: folder.appendingPathComponent(SessionFiles.transcriptJSON),
-                                             options: .atomic)
         let markdown = TranscriptRenderer.markdown(transcript, title: Self.title(for: transcript.recordedAt))
         try markdown.write(to: folder.appendingPathComponent(SessionFiles.transcriptMarkdown),
                            atomically: true, encoding: .utf8)
@@ -89,37 +84,23 @@ public final class CallProcessor: @unchecked Sendable {
         return transcript
     }
 
-    /// Replaces the raw tracks (about 700 MB per hour each) with AAC copies
-    /// and a single mixed `call.m4a` for listening. The raw files are deleted
-    /// only once every compressed file exists and plays.
+    /// Replaces the raw tracks (about 700 MB per hour each) with one mixed
+    /// `call.mp4`. The raw files are deleted only once it exists and plays.
     private func compress(_ folder: URL) async throws {
-        let meRaw = folder.appendingPathComponent(SessionFiles.meRaw)
-        let themRaw = folder.appendingPathComponent(SessionFiles.themRaw)
-        let raws = [meRaw, themRaw].filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard !raws.isEmpty else { return }
-
-        let outputs: [(sources: [URL], destination: URL)] = [
-            ([meRaw], folder.appendingPathComponent(SessionFiles.meCompressed)),
-            ([themRaw], folder.appendingPathComponent(SessionFiles.themCompressed)),
-            ([meRaw, themRaw], folder.appendingPathComponent(SessionFiles.mix)),
-        ]
-        for output in outputs {
-            let sources = output.sources.filter { CallRecorder.duration(of: $0) > 0 }
-            guard !sources.isEmpty else { continue }
-            try await AudioExport.m4a(mixing: sources, to: output.destination)
-        }
+        let raws = [SessionFiles.meRaw, SessionFiles.themRaw].map { folder.appendingPathComponent($0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        let sources = raws.filter { CallRecorder.duration(of: $0) > 0 }
+        guard !sources.isEmpty else { return }
+        try await AudioExport.mp4(mixing: sources, to: folder.appendingPathComponent(SessionFiles.audio))
         for raw in raws {
             try FileManager.default.removeItem(at: raw)
         }
     }
 
-    /// The best available audio for one side: the raw track, else its AAC copy.
+    /// One side's raw track, if it was recorded.
     func track(_ speaker: Speaker, in folder: URL) -> URL? {
-        let names = speaker == .me
-            ? [SessionFiles.meRaw, SessionFiles.meCompressed]
-            : [SessionFiles.themRaw, SessionFiles.themCompressed]
-        return names.map { folder.appendingPathComponent($0) }
-            .first { FileManager.default.fileExists(atPath: $0.path) }
+        let url = folder.appendingPathComponent(speaker == .me ? SessionFiles.meRaw : SessionFiles.themRaw)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
     static func title(for date: Date) -> String {
@@ -140,8 +121,11 @@ enum AudioExport {
         }
     }
 
-    /// Mixes `sources` (all starting at zero) into one AAC file.
-    static func m4a(mixing sources: [URL], to destination: URL) async throws {
+    /// Speech needs no more than this; it keeps an hour of call near 30 MB.
+    static let bitRate = 64_000
+
+    /// Mixes `sources` (all starting at zero) into one mono AAC `.mp4`.
+    static func mp4(mixing sources: [URL], to destination: URL) async throws {
         let composition = AVMutableComposition()
         for url in sources {
             let asset = AVURLAsset(url: url)
@@ -151,13 +135,52 @@ enum AudioExport {
                                                                preferredTrackID: kCMPersistentTrackID_Invalid)
             try compositionTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
         }
-        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
-            throw Failure.unavailable
-        }
+        let tracks = composition.tracks(withMediaType: .audio)
+        guard !tracks.isEmpty else { throw Failure.unavailable }
+
+        let reader = try AVAssetReader(asset: composition)
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsNonInterleaved: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        reader.add(output)
+
         try? FileManager.default.removeItem(at: destination)
-        try await session.export(to: destination, as: .m4a)
+        let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: bitRate,
+        ])
+        input.expectsMediaDataInRealTime = false
+        writer.add(input)
+        guard reader.startReading(), writer.startWriting() else {
+            throw reader.error ?? writer.error ?? Failure.unavailable
+        }
+        writer.startSession(atSourceTime: .zero)
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            var finished = false
+            input.requestMediaDataWhenReady(on: DispatchQueue(label: "app.atrium.export")) {
+                while !finished, input.isReadyForMoreMediaData {
+                    if let buffer = output.copyNextSampleBuffer(), input.append(buffer) { continue }
+                    finished = true
+                    input.markAsFinished()
+                    continuation.resume()
+                }
+            }
+        }
+        await writer.finishWriting()
+        guard reader.status == .completed, writer.status == .completed else {
+            throw reader.error ?? writer.error ?? Failure.unplayable(destination.lastPathComponent)
+        }
         let duration = try await AVURLAsset(url: destination).load(.duration)
         guard duration.isValid, duration.seconds > 0 else { throw Failure.unplayable(destination.lastPathComponent) }
     }
 }
-

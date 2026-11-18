@@ -1,17 +1,15 @@
 import Foundation
 
 /// File names inside one call's folder. The folder is the whole record of a
-/// call; there is no database.
+/// call; there is no database. A finished call is exactly two files: the
+/// audio and the transcript.
 public enum SessionFiles {
     public static let transcriptMarkdown = "transcript.md"
-    public static let transcriptJSON = "transcript.json"
-    public static let mix = "call.m4a"
-    /// Raw tracks, kept until the transcript and compressed audio exist.
+    /// Both sides mixed. `.mp4` rather than `.m4a`, which macOS opens in Music.
+    public static let audio = "call.mp4"
+    /// Raw tracks, kept until the transcript and the audio exist.
     public static let meRaw = "me.caf"
     public static let themRaw = "them.caf"
-    /// Compressed tracks kept after transcription, for listening or redoing it.
-    public static let meCompressed = "me.m4a"
-    public static let themCompressed = "them.m4a"
     public static let error = "transcription-error.txt"
 }
 
@@ -75,8 +73,7 @@ public enum SessionStore {
         let state: Session.State
         if has(SessionFiles.transcriptMarkdown) {
             state = .transcribed
-        } else if has(SessionFiles.meRaw) || has(SessionFiles.themRaw)
-                    || has(SessionFiles.meCompressed) || has(SessionFiles.themCompressed) {
+        } else if has(SessionFiles.meRaw) || has(SessionFiles.themRaw) {
             let error = try? String(contentsOf: folder.appendingPathComponent(SessionFiles.error), encoding: .utf8)
             state = .untranscribed(error: error?.trimmingCharacters(in: .whitespacesAndNewlines))
         } else {

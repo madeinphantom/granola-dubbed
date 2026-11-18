@@ -49,6 +49,22 @@ import Testing
         #expect(merged.count == 2)
     }
 
+    @Test func phraseRepeatedAcrossWindowsIsKeptOnce() {
+        // From a real call: Whisper repeated a phrase where its windows met.
+        let merged = TranscriptMerger.merge(
+            me: [],
+            them: [them(46.5, 48.4, "What's up, buddy? You miss me already?"),
+                   them(48.0, 55.4, "You miss me already? All right, let's hear it.")])
+        #expect(merged.map(\.text) == ["What's up, buddy? You miss me already?", "All right, let's hear it."])
+    }
+
+    @Test func repeatedWordsLaterInTheCallAreKept() {
+        let merged = TranscriptMerger.merge(
+            me: [me(0, 2, "I said yes, yes"), me(10, 11, "yes, yes")],
+            them: [])
+        #expect(merged.map(\.text) == ["I said yes, yes", "yes, yes"])
+    }
+
     @Test func emptyLinesAreRemoved() {
         #expect(TranscriptMerger.merge(me: [me(0, 1, "  ")], them: [them(1, 2, "...")]).isEmpty)
     }
@@ -81,6 +97,70 @@ import Testing
         #expect(SpeechRecognizer.clean("<|startoftranscript|><|en|><|0.00|> Hello, this is a test.<|2.68|>")
                 == "Hello, this is a test.")
         #expect(SpeechRecognizer.clean("<|endoftext|>") == "")
+    }
+
+    @Test func unsureStockPhrasesAreNoiseButClearThanksIsKept() {
+        func words(_ probabilities: [Double]) -> [Word] {
+            probabilities.map { Word(text: "w", start: 0, end: 1, probability: $0) }
+        }
+        // From a real call: "Thank(0.34) you.(1.00)" over a ringtone.
+        #expect(SpeechRecognizer.isStockPhrase("Thank you.", words: words([0.34, 1.0])))
+        #expect(!SpeechRecognizer.isStockPhrase("Thank you.", words: words([0.92, 0.99])))
+        #expect(!SpeechRecognizer.isStockPhrase("No, it's fine.", words: words([0.2, 0.2, 0.2])))
+    }
+
+    @Test func soundLabelsAreNotSpeech() {
+        #expect(SpeechRecognizer.clean("*phone ringing*") == "")
+        #expect(SpeechRecognizer.clean("[Music] (laughs)") == "")
+        #expect(SpeechRecognizer.clean("Hello *coughs* there.") == "Hello there.")
+    }
+}
+
+@Suite struct SpeechRegionTests {
+    private let rate = 16_000
+
+    /// `seconds` of a 300 Hz tone at `db` dBFS RMS, over a noise floor.
+    private func audio(_ parts: [(seconds: Double, db: Float?)], noiseDB: Float = -60) -> [Float] {
+        var generator = SystemRandomNumberGenerator()
+        let noise = pow(10, noiseDB / 20) * 1.7
+        return parts.flatMap { part -> [Float] in
+            let amplitude = part.db.map { pow(10, $0 / 20) * Float(2).squareRoot() } ?? 0
+            return (0..<Int(part.seconds * Double(rate))).map { i in
+                amplitude * Float(sin(2 * Double.pi * 300 * Double(i) / Double(rate)))
+                    + noise * Float.random(in: -1...1, using: &generator)
+            }
+        }
+    }
+
+    private func seconds(_ regions: [Range<Int>]) -> [(Double, Double)] {
+        regions.map { (Double($0.lowerBound) / Double(rate), Double($0.upperBound) / Double(rate)) }
+    }
+
+    @Test func quietMicrophoneSpeechIsFound() {
+        // From a real call: the user's voice at -40 dB over a -60 dB floor.
+        let found = seconds(SpeechRegions.find(in: audio([(3, nil), (2, -40), (3, nil)]), sampleRate: rate))
+        #expect(found.count == 1)
+        #expect(abs(found[0].0 - 2.7) < 0.15 && abs(found[0].1 - 5.4) < 0.15)
+    }
+
+    @Test func shortPausesStayInOneStretchAndLongOnesSplit() {
+        let joined = SpeechRegions.find(in: audio([(1, nil), (1, -30), (0.4, nil), (1, -30), (1, nil)]), sampleRate: rate)
+        #expect(joined.count == 1)
+        let split = SpeechRegions.find(in: audio([(1, nil), (1, -30), (2, nil), (1, -30), (1, nil)]), sampleRate: rate)
+        #expect(split.count == 2)
+    }
+
+    @Test func digitalSilenceAndFaintNoiseAreNotSpeech() {
+        #expect(SpeechRegions.find(in: [Float](repeating: 0, count: rate * 5), sampleRate: rate).isEmpty)
+        // Over digital silence the floor is the absolute minimum, not +12 dB.
+        let faint = audio([(2, nil), (1, -55), (2, nil)], noiseDB: -200)
+        #expect(SpeechRegions.find(in: faint, sampleRate: rate).isEmpty)
+    }
+
+    @Test func nonstopSpeechIsFoundAndFitsInWhisperWindows() {
+        let regions = seconds(SpeechRegions.find(in: audio([(1, nil), (70, -30), (1, nil)]), sampleRate: rate))
+        #expect(regions.count == 3)
+        #expect(regions.allSatisfy { $0.1 - $0.0 <= SpeechRegions.maximumSeconds + 1 })
     }
 }
 
@@ -132,23 +212,7 @@ import Testing
         try file.write(from: buffer)
     }
 
-    @Test func silentSpansAreRecognisedAsSilence() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("atrium-\(UUID()).caf")
-        defer { try? FileManager.default.removeItem(at: url) }
-        try writeTrack(url, seconds: 1, amplitude: 0)
-        let file = try AVAudioFile(forReading: url)
-        #expect(try #require(SpeechRecognizer.rms(of: file, from: 0.2, to: 0.8)) < SpeechRecognizer.silenceRMS)
-    }
-
-    @Test func speechLevelAudioIsNotSilence() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("atrium-\(UUID()).caf")
-        defer { try? FileManager.default.removeItem(at: url) }
-        try writeTrack(url, seconds: 1, amplitude: 0.05)
-        let file = try AVAudioFile(forReading: url)
-        #expect(try #require(SpeechRecognizer.rms(of: file, from: 0.2, to: 0.8)) > SpeechRecognizer.silenceRMS)
-    }
-
-    @Test func compressedMixKeepsBothTracksAndPlays() async throws {
+    @Test func callAudioIsOneSmallMp4OfBothTracks() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("atrium-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -156,10 +220,17 @@ import Testing
         let them = folder.appendingPathComponent(SessionFiles.themRaw)
         try writeTrack(me, seconds: 2, amplitude: 0.3)
         try writeTrack(them, seconds: 3, amplitude: 0.3)
-        let mix = folder.appendingPathComponent(SessionFiles.mix)
-        try await AudioExport.m4a(mixing: [me, them], to: mix)
-        let duration = try await AVURLAsset(url: mix).load(.duration).seconds
+        let audio = folder.appendingPathComponent(SessionFiles.audio)
+        try await AudioExport.mp4(mixing: [me, them], to: audio)
+        let duration = try await AVURLAsset(url: audio).load(.duration).seconds
         #expect(abs(duration - 3) < 0.1)
+        // 64 kbps for 3 s is 24 KB; the old export ran near 250 kbps.
+        let bytes = try #require(try audio.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        #expect(bytes < 40_000, "\(bytes) bytes for 3 s")
+        // Both sources are in the mix: a 440 Hz tone where only `them` plays.
+        let track = try #require(ToneAnalysis.monoSamples(of: audio))
+        let lastSecond = track.samples[Int(2.2 * track.sampleRate)..<Int(2.8 * track.sampleRate)]
+        #expect(try #require(ToneAnalysis.analyse(lastSecond, sampleRate: track.sampleRate)).amplitude > 0.1)
     }
 }
 

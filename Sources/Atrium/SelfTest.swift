@@ -88,15 +88,15 @@ enum SelfTest {
             failures.append("The recording could not be saved")
         }
 
-        // Analysed after compression, so the AAC copy that is kept is what passes.
+        // Analysed in the kept call.mp4, so the file the user gets is what passes.
         var toneWindows: [ToneAnalysis] = []
-        let themURL = folder.appendingPathComponent(SessionFiles.themCompressed)
-        if let toneOffset, let track = ToneAnalysis.monoSamples(of: themURL) {
+        let audioURL = folder.appendingPathComponent(SessionFiles.audio)
+        if let toneOffset, let track = ToneAnalysis.monoSamples(of: audioURL) {
             let window = Int(track.sampleRate * 0.3)
             for offset in stride(from: toneOffset + 0.6, through: toneOffset + toneSeconds - 0.9, by: 0.4) {
                 let start = Int(offset * track.sampleRate)
                 guard start >= 0, start + window <= track.samples.count else {
-                    failures.append("them track ends before the test tone")
+                    failures.append("\(SessionFiles.audio) ends before the test tone")
                     break
                 }
                 toneWindows.append(ToneAnalysis.analyse(track.samples[start..<(start + window)],
@@ -110,7 +110,7 @@ enum SelfTest {
                 failures.append("Test tone is not clean (SNR below \(Int(minimumToneSNR)) dB): noise, static, or loud background audio")
             }
         } else if toneOffset != nil {
-            failures.append("Could not read \(SessionFiles.themCompressed)")
+            failures.append("Could not read \(SessionFiles.audio)")
         }
 
         let markdown = (try? String(contentsOf: folder.appendingPathComponent(SessionFiles.transcriptMarkdown),
@@ -118,17 +118,19 @@ enum SelfTest {
         if markdown.isEmpty {
             let error = (try? String(contentsOf: folder.appendingPathComponent(SessionFiles.error), encoding: .utf8)) ?? "unknown"
             failures.append("No transcript was written: \(error)")
-        } else if let json = try? Data(contentsOf: folder.appendingPathComponent(SessionFiles.transcriptJSON)),
-                  let transcript = try? jsonDecoder.decode(Transcript.self, from: json) {
-            let heardByThem = transcript.utterances.filter { $0.speaker == .them }
-                .map(\.text).joined(separator: " ").lowercased()
+        } else {
+            // Paragraphs are "**Them** [hh:mm:ss]\ntext".
+            let heardByThem = markdown.components(separatedBy: "\n\n")
+                .filter { $0.hasPrefix("**\(Speaker.them.label)**") }
+                .joined(separator: " ").lowercased()
             if !["quick", "fox", "lazy", "dog"].contains(where: heardByThem.contains) {
                 failures.append("The spoken phrase is not in the transcript as \"Them\"")
             }
         }
-        for raw in [SessionFiles.meRaw, SessionFiles.themRaw]
-        where FileManager.default.fileExists(atPath: folder.appendingPathComponent(raw).path) {
-            failures.append("\(raw) was not replaced by compressed audio")
+        let files = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+        let expected: Set = [SessionFiles.audio, SessionFiles.transcriptMarkdown]
+        if files != expected {
+            failures.append("The call folder holds \(files.sorted()), not just \(expected.sorted())")
         }
 
         let report = Report(version: version, passed: failures.isEmpty, failures: failures,
@@ -136,12 +138,6 @@ enum SelfTest {
                             transcriptMarkdown: markdown)
         finish(report, reportURL: reportURL, evidence: failures.isEmpty ? nil : folder)
         try? FileManager.default.removeItem(at: root)
-    }
-
-    private static var jsonDecoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
     }
 
     private static var version: String {

@@ -54,8 +54,8 @@ public enum TranscriptMerger {
     /// substrings, keeps short replies like "no" or "ok" that happen to be
     /// spelled inside the other person's words.
     public static func merge(me: [Utterance], them: [Utterance]) -> [Utterance] {
-        let remote = them.filter { !tokens($0.text).isEmpty }
-        let local = me.filter { mic in
+        let remote = withoutRepeats(them).filter { !tokens($0.text).isEmpty }
+        let local = withoutRepeats(me).filter { mic in
             let micTokens = tokens(mic.text)
             guard !micTokens.isEmpty else { return false }
             return !remote.contains { other in
@@ -63,6 +63,28 @@ public enum TranscriptMerger {
             }
         }
         return (local + remote).sorted { $0.start < $1.start }
+    }
+
+    /// Where one decoding window hands over to the next, Whisper can start a
+    /// line by repeating the end of the line before it ("You miss me
+    /// already?" twice). Repeated leading words of two or more are removed
+    /// from a line that starts within a second of the previous one ending.
+    static func withoutRepeats(_ utterances: [Utterance]) -> [Utterance] {
+        var result: [Utterance] = []
+        for var utterance in utterances.sorted(by: { $0.start < $1.start }) {
+            if let previous = result.last, utterance.start < previous.end + 1 {
+                let before = tokens(previous.text), words = utterance.text.split(separator: " ")
+                let after = words.map { tokens(String($0)).joined() }
+                let limit = min(before.count, after.count)
+                if limit >= 2, let overlap = (2...limit).reversed()
+                    .first(where: { Array(before.suffix($0)) == Array(after.prefix($0)) }) {
+                    utterance.text = words.dropFirst(overlap).joined(separator: " ")
+                    utterance.words = Array(utterance.words.dropFirst(overlap))
+                }
+            }
+            result.append(utterance)
+        }
+        return result
     }
 
     static func isBleed(_ mic: [String], of remote: [String]) -> Bool {

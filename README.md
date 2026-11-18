@@ -13,15 +13,16 @@ Atrium lives in the menu bar. Press **⌃⌥⌘R** (or use the menu) to start an
 stop recording. Transcription runs when you stop; the Whisper model
 (`openai_whisper-large-v3_turbo`, about 1 GB) downloads on first use.
 
-Each call gets its own folder, listed in the menu, containing:
+Each call gets its own folder, listed in the menu, holding two files:
 
 | File | What |
 |---|---|
-| `me.m4a`, `them.m4a` | The two tracks |
-| `call.m4a` | Both tracks mixed, for listening |
+| `call.mp4` | Both sides of the call, mixed (about 30 MB per hour) |
 | `transcript.md` | The transcript, speaker by speaker |
-| `transcript.json` | The transcript with timings |
-| `transcription-error.txt` | Only if transcription failed; retry from the menu |
+
+While a call is recorded and transcribed the folder holds the raw tracks
+(`me.caf`, `them.caf`). If transcription fails they stay, with
+`transcription-error.txt`, until you retry from the menu.
 
 A smaller model: `defaults write app.atrium.mac WhisperModel openai_whisper-small`.
 
@@ -101,11 +102,11 @@ Sources/
    it to the same format. Both feed lock-free ring buffers that `CallRecorder`
    drains to `me.caf` and `them.caf`, padding whichever track started late so
    both share the same start.
-2. **Compress.** After stop, `CallProcessor` replaces the raw tracks with AAC
-   copies and mixes both into `call.m4a`.
-3. **Transcribe.** `CallProcessor` transcribes each track separately; the
+2. **Transcribe.** `CallProcessor` transcribes each track separately; the
    speaker comes from the track. Echo of the other side picked up by the mic
    is dropped. Calls left untranscribed when Atrium quit are resumed at launch.
+3. **Compress.** Once the transcript is written, both raw tracks are mixed
+   into one 64 kbps AAC `call.mp4` and deleted.
 
 The app runs with the hardened runtime and is not sandboxed: CoreAudio process
 taps are unavailable inside the App Sandbox.
